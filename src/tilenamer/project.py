@@ -15,7 +15,7 @@ class TileProject:
 
     def save(self, path: str | Path) -> None:
         payload = {
-            "format_version": 1,
+            "format_version": 2,
             "source_file": self.source_file,
             "tile_size": self.tile_size,
             "assignments": self.model.as_json(),
@@ -27,14 +27,10 @@ class TileProject:
     @classmethod
     def load(cls, path: str | Path) -> "TileProject":
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
-        if payload.get("format_version") != 1:
+        if payload.get("format_version") not in (1, 2):
             raise ValueError("지원하지 않는 프로젝트 파일 버전입니다.")
         tile_size = int(payload["tile_size"])
         if tile_size <= 0:
             raise ValueError("tile_size는 양수여야 합니다.")
-        return cls(
-            source_file=str(payload["source_file"]),
-            tile_size=tile_size,
-            model=AssignmentModel.from_json(payload.get("assignments", {})),
-        )
-
+        return cls(str(payload["source_file"]), tile_size,
+                   AssignmentModel.from_json(payload.get("assignments", {})))
