@@ -1,0 +1,1218 @@
+{
+  "sample_root": "C:\\Users\\SOUTHPAW GAMES\\Desktop\\TileNamer\\타일샘플",
+  "read_only": true,
+  "output_structure": "<tile set folder>/TileImages/<prefix>_<two-digit index>.png",
+  "manifests": [
+    {
+      "relative_path": "타일샘플\\Chapter1\\Chapter1.platformertileset",
+      "display_name": "Chapter1",
+      "tile_count": 45,
+      "image_folder": "타일샘플\\Chapter1\\TileImages"
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\Chapter2.platformertileset",
+      "display_name": "Chapter2",
+      "tile_count": 54,
+      "image_folder": "타일샘플\\Chapter2\\TileImages"
+    }
+  ],
+  "images": [
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Platform_Center_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Platform_Center_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Platform_LeftEnd_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Platform_RightEnd_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Bottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Bottom_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Inner_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_InnerLeftBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_InnerLeftTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_InnerRightBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_InnerRightTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Left_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_LeftBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_LeftBottomBridge_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_LeftBridge_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_LeftTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_LeftTopBridge_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Right_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_RightBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_RightBottomBridge_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_RightBridge_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_RightTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_RightTopBridge_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Top_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Solid_Top_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Bottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Bottom_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Inner_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Inner_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_InnerBackslash_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_InnerLeftBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_InnerLeftTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_InnerRightBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_InnerRightTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_InnerSlash_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Left_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Left_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_LeftBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_LeftTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Right_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Right_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_RightBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_RightTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Top_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter1\\TileImages\\Wall_Top_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_Center_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_Center_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_Center_02.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_Center_03.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_Center_04.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_LeftEnd_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Platform_RightEnd_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Bottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Bottom_01.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Bottom_02.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_02.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_03.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_04.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_05.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_06.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_07.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_08.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_InnerLeftBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_InnerLeftTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_InnerRightBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_InnerRightTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Left_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Left_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Left_02.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Left_03.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftBottomBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftTopBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Right_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Right_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Right_02.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Right_03.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightBottom_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightBottomBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightTop_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightTopBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_00.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_01.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_02.png",
+      "width": 32,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_03.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_04.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_05.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_06.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_End_00_00.png",
+      "width": 32,
+      "height": 100,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_End_01_00.png",
+      "width": 32,
+      "height": 65,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Repeat_00_00.png",
+      "width": 64,
+      "height": 103,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Repeat_01_00.png",
+      "width": 64,
+      "height": 66,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Start_00_00.png",
+      "width": 32,
+      "height": 100,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Start_01_00.png",
+      "width": 32,
+      "height": 66,
+      "extension": ".png",
+      "has_alpha": true
+    }
+  ],
+  "groups": {
+    "Platform_Center": {
+      "observed_indices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Platform_LeftEnd": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Platform_RightEnd": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_Bottom": {
+      "observed_indices": [
+        0,
+        1,
+        2
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_Inner": {
+      "observed_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_InnerLeftBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_InnerLeftTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_InnerRightBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_InnerRightTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_Left": {
+      "observed_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_LeftBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_LeftBottomBridge": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_LeftBridge": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_LeftTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_LeftTopBridge": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_Right": {
+      "observed_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_RightBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_RightBottomBridge": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_RightBridge": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_RightTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_RightTopBridge": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_Top": {
+      "observed_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_TopSequence_End_00": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_TopSequence_End_01": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_TopSequence_Repeat_00": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_TopSequence_Repeat_01": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_TopSequence_Start_00": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Solid_TopSequence_Start_01": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_Bottom": {
+      "observed_indices": [
+        0,
+        1
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_Inner": {
+      "observed_indices": [
+        0,
+        1
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_InnerBackslash": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_InnerLeftBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_InnerLeftTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_InnerRightBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_InnerRightTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_InnerSlash": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_Left": {
+      "observed_indices": [
+        0,
+        1
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_LeftBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_LeftTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_Right": {
+      "observed_indices": [
+        0,
+        1
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_RightBottom": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_RightTop": {
+      "observed_indices": [
+        0
+      ],
+      "index_start": 0,
+      "padding": 2
+    },
+    "Wall_Top": {
+      "observed_indices": [
+        0,
+        1
+      ],
+      "index_start": 0,
+      "padding": 2
+    }
+  },
+  "non_32x32_images": [
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Bottom_01.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Bottom_02.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_07.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Inner_08.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Left_02.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Left_03.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftBottomBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_LeftTopBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Right_02.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Right_03.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightBottomBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_RightTopBridge_00.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_03.png",
+      "width": 64,
+      "height": 32,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_04.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_05.png",
+      "width": 32,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_Top_06.png",
+      "width": 64,
+      "height": 64,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_End_00_00.png",
+      "width": 32,
+      "height": 100,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_End_01_00.png",
+      "width": 32,
+      "height": 65,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Repeat_00_00.png",
+      "width": 64,
+      "height": 103,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Repeat_01_00.png",
+      "width": 64,
+      "height": 66,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Start_00_00.png",
+      "width": 32,
+      "height": 100,
+      "extension": ".png",
+      "has_alpha": true
+    },
+    {
+      "relative_path": "타일샘플\\Chapter2\\TileImages\\Solid_TopSequence_Start_01_00.png",
+      "width": 32,
+      "height": 66,
+      "extension": ".png",
+      "has_alpha": true
+    }
+  ]
+}

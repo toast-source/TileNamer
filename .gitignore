@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+build/
+dist/
+*.spec~
+
+# Read-only external reference material, not application source.
+Platformer.Tile.Editor.v1.0.2/
+타일샘플/

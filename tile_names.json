@@ -1,0 +1,307 @@
+{
+  "format_version": 1,
+  "tile_size": 32,
+  "categories": [
+    {
+      "name": "Platform_Center",
+      "prefix": "Platform_Center",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Platform_LeftEnd",
+      "prefix": "Platform_LeftEnd",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Platform_RightEnd",
+      "prefix": "Platform_RightEnd",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_Bottom",
+      "prefix": "Solid_Bottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_Inner",
+      "prefix": "Solid_Inner",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_InnerLeftBottom",
+      "prefix": "Solid_InnerLeftBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_InnerLeftTop",
+      "prefix": "Solid_InnerLeftTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_InnerRightBottom",
+      "prefix": "Solid_InnerRightBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_InnerRightTop",
+      "prefix": "Solid_InnerRightTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_Left",
+      "prefix": "Solid_Left",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_LeftBottom",
+      "prefix": "Solid_LeftBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_LeftBottomBridge",
+      "prefix": "Solid_LeftBottomBridge",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_LeftBridge",
+      "prefix": "Solid_LeftBridge",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_LeftTop",
+      "prefix": "Solid_LeftTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_LeftTopBridge",
+      "prefix": "Solid_LeftTopBridge",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_Right",
+      "prefix": "Solid_Right",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_RightBottom",
+      "prefix": "Solid_RightBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_RightBottomBridge",
+      "prefix": "Solid_RightBottomBridge",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_RightBridge",
+      "prefix": "Solid_RightBridge",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_RightTop",
+      "prefix": "Solid_RightTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_RightTopBridge",
+      "prefix": "Solid_RightTopBridge",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_Top",
+      "prefix": "Solid_Top",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_TopSequence_End_00",
+      "prefix": "Solid_TopSequence_End_00",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_TopSequence_End_01",
+      "prefix": "Solid_TopSequence_End_01",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_TopSequence_Repeat_00",
+      "prefix": "Solid_TopSequence_Repeat_00",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_TopSequence_Repeat_01",
+      "prefix": "Solid_TopSequence_Repeat_01",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_TopSequence_Start_00",
+      "prefix": "Solid_TopSequence_Start_00",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Solid_TopSequence_Start_01",
+      "prefix": "Solid_TopSequence_Start_01",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_Bottom",
+      "prefix": "Wall_Bottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_Inner",
+      "prefix": "Wall_Inner",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_InnerBackslash",
+      "prefix": "Wall_InnerBackslash",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_InnerLeftBottom",
+      "prefix": "Wall_InnerLeftBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_InnerLeftTop",
+      "prefix": "Wall_InnerLeftTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_InnerRightBottom",
+      "prefix": "Wall_InnerRightBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_InnerRightTop",
+      "prefix": "Wall_InnerRightTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_InnerSlash",
+      "prefix": "Wall_InnerSlash",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_Left",
+      "prefix": "Wall_Left",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_LeftBottom",
+      "prefix": "Wall_LeftBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_LeftTop",
+      "prefix": "Wall_LeftTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_Right",
+      "prefix": "Wall_Right",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_RightBottom",
+      "prefix": "Wall_RightBottom",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_RightTop",
+      "prefix": "Wall_RightTop",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    },
+    {
+      "name": "Wall_Top",
+      "prefix": "Wall_Top",
+      "index_start": 0,
+      "padding": 2,
+      "subfolder": "TileImages"
+    }
+  ]
+}
