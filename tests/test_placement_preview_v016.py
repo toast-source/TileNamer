@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -600,8 +601,8 @@ def test_exact_candidate_three_fixture_selects_number_two(tmp_path: Path) -> Non
 
 def test_multicell_irregular_hit_testing_and_space_pan_suppresses_click() -> None:
     qt = app()
-    rectangular = AssetAssignment("Solid_LeftTop", 0, 0, 2, 2)
-    rectangular_model = AssignmentModel({"Solid_LeftTop": [rectangular]})
+    rectangular = AssetAssignment("Solid_Inner", 0, 0, 2, 2)
+    rectangular_model = AssignmentModel({"Solid_Inner": [rectangular]})
     rectangular_result = build_placement_result("Solid", rectangular_model)
     rectangular_target = next(
         cell for cell in rectangular_result.cells if cell.assignment_identity is not None
@@ -622,14 +623,15 @@ def test_multicell_irregular_hit_testing_and_space_pan_suppresses_click() -> Non
         assert rectangular_canvas.hovered_cell is rectangular_target
 
     assignment = AssetAssignment.from_cells(
-        "Solid_LeftTop", ((0, 0), (1, 0), (0, 1)),
+        "Solid_Inner", ((0, 0), (1, 0), (0, 1)),
     )
-    model = AssignmentModel({"Solid_LeftTop": [assignment]})
+    model = AssignmentModel({"Solid_Inner": [assignment]})
     result = build_placement_result("Solid", model)
     target = next(cell for cell in result.cells if cell.assignment_identity is not None)
+    isolated_result = replace(result, cells=(target,))
     canvas = PlacementCanvas()
     canvas.resize(760, 420)
-    canvas.set_preview(result, PlacementPreviewSource(
+    canvas.set_preview(isolated_result, PlacementPreviewSource(
         model, Image.new("RGBA", (64, 64), (255, 255, 255, 255)),
         GridReference(), ((138, 143, 150, 255), (107, 112, 119, 255)),
     ))
@@ -640,7 +642,8 @@ def test_multicell_irregular_hit_testing_and_space_pan_suppresses_click() -> Non
         assert canvas.hit_test(canvas.logical_cell_center(coord)) is target
         move_mouse(canvas, canvas.logical_cell_center(coord))
         assert canvas.hovered_cell is target
-    hole = (target.x + 1, target.y + 1)
+    xs, ys = zip(*target.occupied_cells)
+    hole = (max(xs), max(ys))
     assert hole not in target.occupied_cells
     assert canvas.hit_test(canvas.logical_cell_center(hole)) is None
     move_mouse(canvas, canvas.logical_cell_center(hole))
@@ -726,7 +729,7 @@ def test_wall_diagonal_fallback_hover_and_click_navigate_missing_role(
     assert preview is not None
     preview.family_combo.setCurrentText("Wall")
     wait_for_preview()
-    assert preview.summary_label.text() == "준비 13 / 15 · 누락 2"
+    assert preview.summary_label.text() == "준비 13 / 15 · 대체 2 · 누락 2"
     fallback = next(cell for cell in preview.canvas.result.cells
                     if cell.fallback_for == "Wall_InnerBackslash")
     move_mouse(preview.canvas, preview.canvas.logical_cell_center(fallback.occupied_cells[0]))
@@ -738,7 +741,8 @@ def test_wall_diagonal_fallback_hover_and_click_navigate_missing_role(
     assert window.current_category() == "Wall_InnerBackslash"
     assert window.assignment_list.count() == 0
     assert window.statusBar().currentMessage() == (
-        "이 타일이 필요합니다: Wall_InnerBackslash"
+        "Wall_InnerBackslash가 필요합니다. "
+        "현재 Wall_Inner_00.png을 대체 표시 중입니다."
     )
     window.close()
     qt.processEvents()
@@ -994,7 +998,7 @@ def test_top_sequence_family_widget_missing_and_exact_candidate_navigation(
     window.refresh_assignments()
     preview.family_combo.setCurrentText("Top Sequence 00")
     wait_for_preview()
-    assert preview.summary_label.text() == "준비 1 / 3 · 누락 2"
+    assert preview.summary_label.text() == "준비 1 / 3 · 대체 0 · 누락 2"
     start_00 = next(cell for cell in preview.canvas.result.cells if cell.role == "Start")
     start_pixmap = preview.canvas.pixmaps[start_00.assignment_identity]
     assert (start_pixmap.width(), start_pixmap.height()) == (32, 96)

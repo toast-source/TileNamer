@@ -8,6 +8,13 @@ from typing import Mapping, Sequence
 from .model import AssetAssignment, AssignmentModel
 
 LogicalCoord = tuple[int, int]
+NO_FIT_CANDIDATE = "NO_FIT_CANDIDATE"
+NORMAL = "NORMAL"
+REFERENCE_FALLBACK = "REFERENCE_FALLBACK"
+MISSING = "MISSING"
+OPTIONAL_ABSENT = "OPTIONAL_ABSENT"
+ALLOWED_FALLBACK = "ALLOWED_FALLBACK"
+WARNING_FALLBACK = "WARNING_FALLBACK"
 
 
 SAMPLE_PATTERNS: dict[str, dict[str, tuple[str, ...]]] = {
@@ -102,6 +109,7 @@ class PlacementCell:
     family: str
     role: str
     category: str
+    required_category: str
     candidate_index: int | None
     assignment_identity: AssignmentIdentity | None
     filename: str | None
@@ -109,14 +117,57 @@ class PlacementCell:
     width_cells: int = 1
     height_cells: int = 1
     fallback_for: str | None = None
+    diagnostic: str | None = None
+    resolution_state: str = NORMAL
+    fallback_reason: str | None = None
+    fallback_severity: str | None = None
+
+    @property
+    def required_role(self) -> str:
+        return self.required_category
+
+    @property
+    def rendered_source_role(self) -> str | None:
+        return self.category if self.assignment_identity is not None else None
+
+    @property
+    def guide_role(self) -> str:
+        return self.required_category
+
+    @property
+    def is_reference_fallback(self) -> bool:
+        return self.resolution_state == REFERENCE_FALLBACK
 
     @property
     def is_missing(self) -> bool:
-        return self.candidate_index is None
+        return self.resolution_state == MISSING
+
+    @property
+    def is_no_fit(self) -> bool:
+        return self.resolution_state == NO_FIT_CANDIDATE
+
+    @property
+    def is_optional_absent(self) -> bool:
+        return self.resolution_state == OPTIONAL_ABSENT
 
     @property
     def is_warning(self) -> bool:
-        return self.is_missing or self.fallback_for is not None
+        return self.is_missing or self.is_no_fit or self.is_reference_fallback
+
+    def provenance_tuple(
+        self, guide_resource: str | None = None,
+    ) -> tuple[object, ...]:
+        return (
+            (self.x, self.y),
+            self.required_role,
+            self.resolution_state,
+            self.rendered_source_role,
+            self.filename,
+            self.occupied_cells,
+            self.fallback_reason,
+            self.guide_role,
+            guide_resource,
+        )
 
 
 @dataclass(frozen=True)
@@ -130,10 +181,25 @@ class PlacementResult:
     ready_roles: frozenset[str]
     missing_counts: tuple[tuple[str, int], ...]
     logical_occupied: frozenset[LogicalCoord] = frozenset()
+    no_fit_counts: tuple[tuple[str, int], ...] = ()
+    fallback_counts: tuple[tuple[str, str, int], ...] = ()
+    optional_absent_counts: tuple[tuple[str, int], ...] = ()
 
     @property
     def missing_cell_count(self) -> int:
         return sum(count for _, count in self.missing_counts)
+
+    @property
+    def fallback_cell_count(self) -> int:
+        return sum(count for _, _, count in self.fallback_counts)
+
+    @property
+    def optional_absent_cell_count(self) -> int:
+        return sum(count for _, count in self.optional_absent_counts)
+
+    @property
+    def resolution_counts(self) -> tuple[tuple[str, int], ...]:
+        return tuple(sorted(Counter(cell.resolution_state for cell in self.cells).items()))
 
 
 def _occupied(pattern: Sequence[str]) -> set[LogicalCoord]:
@@ -169,17 +235,49 @@ class _LogicalRole:
         return f"{self.family}_{self.role}"
 
 
-BRIDGE_FALLBACKS = {
-    "Solid_LeftTopBridge": "Solid_LeftTop",
-    "Solid_RightTopBridge": "Solid_RightTop",
-    "Solid_LeftBridge": "Solid_Left",
-    "Solid_RightBridge": "Solid_Right",
-    "Solid_LeftBottomBridge": "Solid_LeftBottom",
-    "Solid_RightBottomBridge": "Solid_RightBottom",
+@dataclass(frozen=True)
+class FallbackRule:
+    source_category: str
+    severity: str
+    reason: str
+
+
+REFERENCE_FALLBACK_RULES = {
+    "Solid_LeftTopBridge": FallbackRule(
+        "Solid_LeftTop", ALLOWED_FALLBACK, "Reference Bridge fallback",
+    ),
+    "Solid_RightTopBridge": FallbackRule(
+        "Solid_RightTop", ALLOWED_FALLBACK, "Reference Bridge fallback",
+    ),
+    "Solid_LeftBridge": FallbackRule(
+        "Solid_Left", ALLOWED_FALLBACK, "Reference Bridge fallback",
+    ),
+    "Solid_RightBridge": FallbackRule(
+        "Solid_Right", ALLOWED_FALLBACK, "Reference Bridge fallback",
+    ),
+    "Solid_LeftBottomBridge": FallbackRule(
+        "Solid_LeftBottom", ALLOWED_FALLBACK, "Reference Bridge fallback",
+    ),
+    "Solid_RightBottomBridge": FallbackRule(
+        "Solid_RightBottom", ALLOWED_FALLBACK, "Reference Bridge fallback",
+    ),
+    "Wall_InnerSlash": FallbackRule(
+        "Wall_Inner", WARNING_FALLBACK, "Reference Wall diagonal fallback",
+    ),
+    "Wall_InnerBackslash": FallbackRule(
+        "Wall_Inner", WARNING_FALLBACK, "Reference Wall diagonal fallback",
+    ),
 }
+BRIDGE_FALLBACKS = {
+    category: rule.source_category
+    for category, rule in REFERENCE_FALLBACK_RULES.items()
+    if category.startswith("Solid_")
+}
+OPTIONAL_REFERENCE_ROLES = frozenset(BRIDGE_FALLBACKS)
 WALL_DIAGONAL_FALLBACKS = {
-    "Wall_InnerSlash": "Wall_Inner",
-    "Wall_InnerBackslash": "Wall_Inner",
+    category: rule.source_category
+    for category, rule in REFERENCE_FALLBACK_RULES.items()
+    if category.startswith("Wall_")
 }
 
 
@@ -331,6 +429,33 @@ def available_families() -> tuple[str, ...]:
     return ("Solid", "Wall", "Platform", "Top Sequence 00", "Top Sequence 01")
 
 
+def required_role_matrix(
+    family: str, pattern_name: str,
+) -> tuple[tuple[LogicalCoord, str], ...]:
+    """Return topology-only canonical roles without consulting candidates."""
+    if family in TOP_SEQUENCE_SPECS:
+        sequence_index, height = TOP_SEQUENCE_SPECS[family]
+        repeat_count = TOP_SEQUENCE_REPEAT_COUNTS[pattern_name]
+        parts = ("Start",) + ("Repeat",) * repeat_count + ("End",)
+        matrix: list[tuple[LogicalCoord, str]] = []
+        x = 0
+        for part in parts:
+            width = 2 if part == "Repeat" else 1
+            category = f"Solid_TopSequence_{part}_{sequence_index}"
+            matrix.extend(
+                ((x + dx, dy), category)
+                for dy in range(height) for dx in range(width)
+            )
+            x += width
+        return tuple(matrix)
+    pattern = SAMPLE_PATTERNS[family][pattern_name]
+    logical_roles = _resolve_logical_roles(family, _occupied(pattern))
+    return tuple(sorted(
+        ((position, role.category) for position, role in logical_roles.items()),
+        key=lambda item: (item[0][1], item[0][0]),
+    ))
+
+
 def _relative_footprint(assignment: AssetAssignment) -> tuple[LogicalCoord, ...]:
     cells = assignment.selected_cells or ((assignment.x_cell, assignment.y_cell),)
     left = min(x for x, _ in cells)
@@ -345,13 +470,11 @@ def _candidate_pool(
     candidates = assets_by_category.get(semantic_category, ())
     if candidates:
         return semantic_category, candidates
-    fallback = BRIDGE_FALLBACKS.get(semantic_category) or WALL_DIAGONAL_FALLBACKS.get(
-        semantic_category
-    )
-    if fallback:
-        fallback_candidates = assets_by_category.get(fallback, ())
+    fallback_rule = REFERENCE_FALLBACK_RULES.get(semantic_category)
+    if fallback_rule:
+        fallback_candidates = assets_by_category.get(fallback_rule.source_category, ())
         if fallback_candidates:
-            return fallback, fallback_candidates
+            return fallback_rule.source_category, fallback_candidates
     return semantic_category, ()
 
 
@@ -405,37 +528,154 @@ def _bridge_proposal(
     semantic: _LogicalRole,
     candidates: Sequence[AssetAssignment],
     logical_roles: Mapping[LogicalCoord, _LogicalRole],
+    reserved: set[LogicalCoord] | frozenset[LogicalCoord] = frozenset(),
 ) -> _PlacementProposal | None:
-    if semantic.category not in BRIDGE_FALLBACKS or not candidates:
+    options = _bridge_candidate_options(
+        anchor, semantic, candidates, logical_roles, reserved,
+    )
+    selected = _select_candidate_option(semantic.category, anchor, options)
+    if selected is None or selected.assignment.width_cells == 1:
         return None
+    return _PlacementProposal(
+        anchor, semantic, semantic.category, selected.index, selected.assignment,
+        selected.footprint, selected.bounds,
+    )
+
+
+@dataclass(frozen=True)
+class _CandidateOption:
+    index: int
+    assignment: AssetAssignment
+    footprint: tuple[LogicalCoord, ...]
+    bounds: tuple[LogicalCoord, ...]
+
+
+def _select_candidate_option(
+    category: str, anchor: LogicalCoord, options: Sequence[_CandidateOption],
+) -> _CandidateOption | None:
+    selected = deterministic_candidate_index(category, anchor[0], anchor[1], len(options))
+    return options[selected] if selected is not None else None
+
+
+def _ordinary_origin(
+    anchor: LogicalCoord, role: str, width: int, height: int,
+) -> LogicalCoord:
     x, y = anchor
-    start = deterministic_candidate_index(semantic.category, x, y, len(candidates))
-    if start is None:
-        return None
-    for offset in range(len(candidates)):
-        index = (start + offset) % len(candidates)
-        candidate = candidates[index]
-        if candidate.width_cells == 1 and candidate.height_cells == 1:
-            return None
-        if candidate.height_cells != 1:
+    if role.startswith("Right") and not role.startswith("InnerRight"):
+        x -= width - 1
+    if role == "Bottom" or role.endswith("Bottom") or role.startswith("Inner"):
+        y -= height - 1
+    return x, y
+
+
+def _expected_ordinary_role(
+    role: str, offset: LogicalCoord, width: int, height: int,
+) -> str:
+    dx, dy = offset
+    if role == "Inner":
+        return "Inner"
+    if role.startswith("Inner"):
+        return role if (dx, dy) == (0, height - 1) else "Inner"
+
+    expose_left = role.startswith("Left")
+    expose_right = role.startswith("Right")
+    expose_top = role == "Top" or role.endswith("Top")
+    expose_bottom = role == "Bottom" or role.endswith("Bottom")
+    horizontal = (
+        "Left" if expose_left and dx == 0
+        else "Right" if expose_right and dx == width - 1
+        else ""
+    )
+    vertical = (
+        "Top" if expose_top and dy == 0
+        else "Bottom" if expose_bottom and dy == height - 1
+        else ""
+    )
+    if horizontal and vertical:
+        return horizontal + vertical
+    return horizontal or vertical or "Inner"
+
+
+def _ordinary_candidate_options(
+    anchor: LogicalCoord,
+    semantic: _LogicalRole,
+    actual_category: str,
+    candidates: Sequence[AssetAssignment],
+    logical_roles: Mapping[LogicalCoord, _LogicalRole],
+    reserved: set[LogicalCoord] | frozenset[LogicalCoord] = frozenset(),
+) -> list[_CandidateOption]:
+    options: list[_CandidateOption] = []
+    direct = actual_category == semantic.category
+    for index, candidate in enumerate(candidates):
+        width, height = candidate.width_cells, candidate.height_cells
+        if semantic.family == "Platform":
+            if (width, height) != (1, 1):
+                continue
+        elif width > 4 or height > 4:
             continue
-        origin_x = x - candidate.width_cells + 1 if semantic.role.startswith("Left") else x
-        footprint, bounds = _placement_geometry(candidate, (origin_x, y))
-        anchor_column = max(px for px, _ in bounds) if semantic.role.startswith("Left") else min(
-            px for px, _ in bounds
-        )
+        if not direct and (width, height) != (1, 1):
+            # Reference fallbacks substitute the missing single role; they are
+            # not permission to stamp an unrelated multi-cell pattern.
+            continue
+        origin = _ordinary_origin(anchor, semantic.role, width, height)
+        footprint, bounds = _placement_geometry(candidate, origin)
+        if anchor not in footprint or any(position in reserved for position in footprint):
+            continue
+        if (width, height) == (1, 1):
+            options.append(_CandidateOption(index, candidate, footprint, bounds))
+            continue
         valid = True
-        for position in bounds:
+        origin_x, origin_y = origin
+        for position in footprint:
             logical = logical_roles.get(position)
-            if position[0] == anchor_column:
-                valid = valid and position == anchor and logical == semantic
-            else:
-                valid = valid and logical is not None and logical.family == "Platform"
-        if valid and anchor in footprint:
-            return _PlacementProposal(
-                anchor, semantic, semantic.category, index, candidate, footprint, bounds,
+            expected_role = _expected_ordinary_role(
+                semantic.role,
+                (position[0] - origin_x, position[1] - origin_y),
+                width,
+                height,
             )
-    return None
+            if logical is None or logical != _LogicalRole(semantic.family, expected_role):
+                valid = False
+                break
+        if valid:
+            options.append(_CandidateOption(index, candidate, footprint, bounds))
+    return options
+
+
+def _bridge_candidate_options(
+    anchor: LogicalCoord,
+    semantic: _LogicalRole,
+    candidates: Sequence[AssetAssignment],
+    logical_roles: Mapping[LogicalCoord, _LogicalRole],
+    reserved: set[LogicalCoord] | frozenset[LogicalCoord] = frozenset(),
+) -> list[_CandidateOption]:
+    if semantic.category not in BRIDGE_FALLBACKS:
+        return []
+    x, y = anchor
+    options: list[_CandidateOption] = []
+    for index, candidate in enumerate(candidates):
+        size = candidate.width_cells, candidate.height_cells
+        if size == (1, 1):
+            footprint, bounds = _placement_geometry(candidate, anchor)
+            if anchor not in reserved:
+                options.append(_CandidateOption(index, candidate, footprint, bounds))
+            continue
+        if size != (2, 1):
+            continue
+        origin = (x - 1, y) if semantic.role.startswith("Left") else (x, y)
+        footprint, bounds = _placement_geometry(candidate, origin)
+        if set(footprint) != set(bounds) or anchor not in footprint:
+            continue
+        if any(position in reserved for position in footprint):
+            continue
+        platform_position = (x - 1, y) if semantic.role.startswith("Left") else (x + 1, y)
+        if (
+            logical_roles.get(anchor) == semantic
+            and logical_roles.get(platform_position) is not None
+            and logical_roles[platform_position].family == "Platform"
+        ):
+            options.append(_CandidateOption(index, candidate, footprint, bounds))
+    return options
 
 
 def _ordinary_proposal(
@@ -443,52 +683,72 @@ def _ordinary_proposal(
     semantic: _LogicalRole,
     actual_category: str,
     candidates: Sequence[AssetAssignment],
-    occupied: set[LogicalCoord],
+    logical_roles: Mapping[LogicalCoord, _LogicalRole],
+    reserved: set[LogicalCoord] | frozenset[LogicalCoord] = frozenset(),
 ) -> _PlacementProposal | None:
-    if not candidates:
+    options = _ordinary_candidate_options(
+        anchor, semantic, actual_category, candidates, logical_roles, reserved,
+    )
+    selected = _select_candidate_option(actual_category, anchor, options)
+    if selected is None or selected.assignment.width_cells * selected.assignment.height_cells == 1:
         return None
-    x, y = anchor
-    start = deterministic_candidate_index(actual_category, x, y, len(candidates))
-    if start is None:
-        return None
-    for offset in range(len(candidates)):
-        index = (start + offset) % len(candidates)
-        candidate = candidates[index]
-        if candidate.width_cells == 1 and candidate.height_cells == 1:
-            return None
-        footprint, bounds = _placement_geometry(candidate, anchor)
-        if all(position in occupied for position in bounds):
-            return _PlacementProposal(
-                anchor, semantic, actual_category, index, candidate, footprint, bounds,
-                semantic.category if semantic.category in WALL_DIAGONAL_FALLBACKS else None,
-            )
-    return None
+    return _PlacementProposal(
+        anchor, semantic, actual_category, selected.index, selected.assignment,
+        selected.footprint, selected.bounds,
+        semantic.category if actual_category != semantic.category else None,
+    )
 
 
 def _make_cell(
     anchor: LogicalCoord, semantic: _LogicalRole, actual_category: str,
     candidate_index: int | None, assignment: AssetAssignment | None,
     footprint: tuple[LogicalCoord, ...], fallback_for: str | None = None,
+    diagnostic: str | None = None,
+    logical_size: tuple[int, int] | None = None,
+    required_category: str | None = None,
 ) -> PlacementCell:
     x, y = anchor
+    required_category = required_category or semantic.category
     identity = (
         AssignmentIdentity(actual_category, assignment.selected_cells or ())
         if assignment is not None else None
     )
+    if diagnostic == NO_FIT_CANDIDATE:
+        resolution_state = NO_FIT_CANDIDATE
+    elif diagnostic == OPTIONAL_ABSENT:
+        resolution_state = OPTIONAL_ABSENT
+    elif assignment is None:
+        resolution_state = MISSING
+    elif actual_category != required_category:
+        resolution_state = REFERENCE_FALLBACK
+    else:
+        resolution_state = NORMAL
+    fallback_rule = (
+        REFERENCE_FALLBACK_RULES.get(required_category)
+        if resolution_state == REFERENCE_FALLBACK else None
+    )
+    fallback_for = required_category if fallback_rule is not None else None
     return PlacementCell(
         x=x,
         y=y,
         family=semantic.family,
         role=semantic.role,
         category=actual_category,
+        required_category=required_category,
         candidate_index=candidate_index,
         assignment_identity=identity,
         filename=(f"{actual_category}_{candidate_index:02d}.png"
                   if candidate_index is not None else None),
         occupied_cells=footprint,
-        width_cells=assignment.width_cells if assignment is not None else 1,
-        height_cells=assignment.height_cells if assignment is not None else 1,
+        width_cells=(assignment.width_cells if assignment is not None
+                     else logical_size[0] if logical_size is not None else 1),
+        height_cells=(assignment.height_cells if assignment is not None
+                      else logical_size[1] if logical_size is not None else 1),
         fallback_for=fallback_for,
+        diagnostic=diagnostic,
+        resolution_state=resolution_state,
+        fallback_reason=fallback_rule.reason if fallback_rule is not None else None,
+        fallback_severity=fallback_rule.severity if fallback_rule is not None else None,
     )
 
 
@@ -508,6 +768,7 @@ def _build_top_sequence_result(
     }
     ready: set[str] = set()
     missing: Counter[str] = Counter()
+    no_fit: Counter[str] = Counter()
     cells: list[PlacementCell] = []
     logical_occupied: set[LogicalCoord] = set()
     x = 0
@@ -515,11 +776,19 @@ def _build_top_sequence_result(
     for part in parts:
         category = f"Solid_TopSequence_{part}_{sequence_index}"
         candidates = assets_by_category.get(category, ())
-        candidate_index = deterministic_candidate_index(category, x, 0, len(candidates))
-        assignment = candidates[candidate_index] if candidate_index is not None else None
         default_width = 2 if part == "Repeat" else 1
-        width_cells = assignment.width_cells if assignment is not None else default_width
-        height_cells = assignment.height_cells if assignment is not None else reference_height
+        eligible = [
+            (index, candidate)
+            for index, candidate in enumerate(candidates)
+            if candidate.width_cells == default_width
+            and candidate.height_cells == reference_height
+            and candidate.width_cells <= 4
+            and candidate.height_cells <= 4
+        ]
+        selected = deterministic_candidate_index(category, x, 0, len(eligible))
+        candidate_index, assignment = eligible[selected] if selected is not None else (None, None)
+        width_cells, height_cells = default_width, reference_height
+        diagnostic = None
         if assignment is not None:
             footprint, bounds = _placement_geometry(assignment, (x, 0))
             ready.add(category)
@@ -530,11 +799,18 @@ def _build_top_sequence_result(
                 for offset_x in range(width_cells)
             )
             footprint = bounds
-            missing[category] += 1
+            if candidates:
+                diagnostic = NO_FIT_CANDIDATE
+                no_fit[category] += 1
+                ready.add(category)
+            else:
+                missing[category] += 1
         logical_occupied.update(bounds)
         cells.append(_make_cell(
             (x, 0), _LogicalRole(family, part), category,
-            candidate_index, assignment, footprint,
+            candidate_index, assignment, footprint, diagnostic=diagnostic,
+            logical_size=(width_cells, height_cells),
+            required_category=category,
         ))
         x += width_cells
         height = max(height, height_cells)
@@ -548,6 +824,7 @@ def _build_top_sequence_result(
         ready_roles=frozenset(ready),
         missing_counts=tuple(sorted(missing.items())),
         logical_occupied=frozenset(logical_occupied),
+        no_fit_counts=tuple(sorted(no_fit.items())),
     )
 def build_placement_result(
     family: str,
@@ -574,6 +851,9 @@ def build_placement_result(
     logical_roles = _resolve_logical_roles(family, occupied)
     cells: list[PlacementCell] = []
     missing: Counter[str] = Counter()
+    no_fit: Counter[str] = Counter()
+    fallback_counts: Counter[tuple[str, str]] = Counter()
+    optional_absent: Counter[str] = Counter()
     required = {logical.category for logical in logical_roles.values()}
     ready: set[str] = set()
     covered: set[LogicalCoord] = set()
@@ -587,13 +867,13 @@ def build_placement_result(
             proposal = _bridge_proposal(position, semantic, candidates, logical_roles)
         else:
             proposal = _ordinary_proposal(
-                position, semantic, actual_category, candidates, occupied,
+                position, semantic, actual_category, candidates, logical_roles,
             )
         if proposal is not None:
             proposals.append(proposal)
     proposals.sort(key=lambda proposal: (
         -proposal.priority,
-        -len(proposal.bounds),
+        -len(proposal.footprint),
         -(zlib.crc32(
             f"{proposal.semantic.category}:{proposal.anchor[0]}:{proposal.anchor[1]}".encode(
                 "utf-8"
@@ -603,12 +883,14 @@ def build_placement_result(
         proposal.anchor[0],
     ))
     for proposal in proposals:
-        if any(position in covered for position in proposal.bounds):
+        if any(position in covered for position in proposal.footprint):
             continue
-        covered.update(proposal.bounds)
-        for position in proposal.bounds:
+        covered.update(proposal.footprint)
+        for position in proposal.footprint:
             if position == proposal.anchor and proposal.fallback_for is not None:
-                missing[proposal.fallback_for] += 1
+                if proposal.fallback_for not in OPTIONAL_REFERENCE_ROLES:
+                    missing[proposal.fallback_for] += 1
+                fallback_counts[(proposal.fallback_for, proposal.actual_category)] += 1
             else:
                 ready.add(logical_roles[position].category)
         cells.append(_make_cell(
@@ -627,44 +909,44 @@ def build_placement_result(
         semantic = logical_roles[(x, y)]
         semantic_category = semantic.category
         category, candidates = _candidate_pool(semantic_category, assets_by_category)
-        fallback_for = (
-            semantic_category
-            if category != semantic_category and semantic_category in WALL_DIAGONAL_FALLBACKS
-            else None
-        )
+        fallback_for = semantic_category if category != semantic_category else None
         candidate_index = None
         placement_cells = ((x, y),)
         assignment: AssetAssignment | None = None
-        start = deterministic_candidate_index(category, x, y, len(candidates))
-        if start is not None:
-            for candidate_offset in range(len(candidates)):
-                index = (start + candidate_offset) % len(candidates)
-                candidate = candidates[index]
-                # Direct multi-cell Bridge candidates were handled by the
-                # priority pass above; do not place them with a top-left anchor.
-                if category == semantic_category and semantic_category in BRIDGE_FALLBACKS \
-                        and (candidate.width_cells > 1 or candidate.height_cells > 1):
-                    continue
-                footprint, bounds = _placement_geometry(candidate, (x, y))
-                if all(cell in occupied and cell not in covered for cell in bounds):
-                    candidate_index = index
-                    assignment = candidate
-                    placement_cells = footprint
-                    break
+        diagnostic = None
+        if category == semantic_category and semantic_category in BRIDGE_FALLBACKS:
+            options = _bridge_candidate_options(
+                (x, y), semantic, candidates, logical_roles, covered,
+            )
+        else:
+            options = _ordinary_candidate_options(
+                (x, y), semantic, category, candidates, logical_roles, covered,
+            )
+        selected = _select_candidate_option(category, (x, y), options)
+        if selected is not None:
+            candidate_index = selected.index
+            assignment = selected.assignment
+            placement_cells = selected.footprint
         if candidate_index is None:
-            missing[semantic_category] += 1
+            if candidates and category == semantic_category:
+                diagnostic = NO_FIT_CANDIDATE
+                no_fit[semantic_category] += 1
+                ready.add(semantic_category)
+            elif semantic_category in OPTIONAL_REFERENCE_ROLES:
+                optional_absent[semantic_category] += 1
+                diagnostic = OPTIONAL_ABSENT
+            else:
+                missing[semantic_category] += 1
         elif fallback_for is not None:
-            missing[semantic_category] += 1
+            if semantic_category not in OPTIONAL_REFERENCE_ROLES:
+                missing[semantic_category] += 1
+            fallback_counts[(semantic_category, category)] += 1
         else:
             ready.add(semantic_category)
-            covered.update(
-                (x + offset_x, y + offset_y)
-                for offset_y in range(assignment.height_cells)
-                for offset_x in range(assignment.width_cells)
-            )
+            covered.update(placement_cells)
         cells.append(_make_cell(
             (x, y), semantic, category, candidate_index, assignment, placement_cells,
-            fallback_for,
+            fallback_for, diagnostic,
         ))
     return PlacementResult(
         family=family,
@@ -676,4 +958,10 @@ def build_placement_result(
         ready_roles=frozenset(ready),
         missing_counts=tuple(sorted(missing.items())),
         logical_occupied=frozenset(occupied),
+        no_fit_counts=tuple(sorted(no_fit.items())),
+        fallback_counts=tuple(
+            (required, source, count)
+            for (required, source), count in sorted(fallback_counts.items())
+        ),
+        optional_absent_counts=tuple(sorted(optional_absent.items())),
     )

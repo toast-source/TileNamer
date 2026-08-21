@@ -12,16 +12,18 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-    QStyle, QVBoxLayout, QWidget,
+    QSlider, QStyle, QVBoxLayout, QWidget,
 )
 
 from .exporter import extract_assignment_image
+from .guides import GuideAsset, GuidePlacement, build_guide_placements, load_guide_registry
 from .grid import GridReference
 from .model import AssignmentModel
 from .placement import (
-    PlacementCell, PlacementResult, available_families, available_patterns,
-    build_placement_result,
+    ALLOWED_FALLBACK, WARNING_FALLBACK, PlacementCell, PlacementResult,
+    available_families, available_patterns, build_placement_result,
 )
+from .preferences import Preferences
 
 
 @dataclass(frozen=True)
@@ -105,10 +107,16 @@ class PlacementCanvas(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
         self.result: PlacementResult | None = None
         self.pixmaps: dict[object, QPixmap] = {}
+        self.guide_placements: tuple[GuidePlacement, ...] = ()
+        self.guide_pixmaps: dict[GuideAsset, QPixmap] = {}
+        self.guides_enabled = True
+        self.guide_opacity = 25
         self.show_grid = True
         self.alpha_colors = (QColor(138, 143, 150), QColor(107, 112, 119))
         self.workspace_color = QColor("#24272b")
         self.field_color = QColor("#30353a")
+        self.allowed_fallback_color = QColor("#f2b66d")
+        self.warning_fallback_color = QColor("#f09a9a")
         self.zoom = 1.0
         self.pan_offset = QPointF()
         self.fit_mode = True
@@ -143,6 +151,30 @@ class PlacementCanvas(QWidget):
             self.request_fit()
         self.update()
 
+    def set_guides(
+        self, placements: tuple[GuidePlacement, ...], enabled: bool, opacity: int,
+    ) -> None:
+        self.guide_placements = placements
+        retained = {
+            asset: pixmap for asset, pixmap in self.guide_pixmaps.items()
+            if any(placement.asset == asset for placement in placements)
+        }
+        for placement in placements:
+            if placement.asset not in retained:
+                retained[placement.asset] = QPixmap(str(placement.asset.path))
+        self.guide_pixmaps = retained
+        self.guides_enabled = bool(enabled)
+        self.guide_opacity = max(5, min(80, int(opacity)))
+        self.update()
+
+    def set_guides_enabled(self, enabled: bool) -> None:
+        self.guides_enabled = bool(enabled)
+        self.update()
+
+    def set_guide_opacity(self, opacity: int) -> None:
+        self.guide_opacity = max(5, min(80, int(opacity)))
+        self.update()
+
     def set_grid_visible(self, visible: bool) -> None:
         self.show_grid = visible
         self.update()
@@ -150,6 +182,8 @@ class PlacementCanvas(QWidget):
     def set_theme(self, dark: bool) -> None:
         self.workspace_color = QColor("#24272b" if dark else "#d9dee3")
         self.field_color = QColor("#343a40" if dark else "#f4f6f8")
+        self.allowed_fallback_color = QColor("#f2b66d" if dark else "#9b5b12")
+        self.warning_fallback_color = QColor("#f09a9a" if dark else "#a22d2d")
         self.update()
 
     def fit_view(self) -> None:
@@ -337,8 +371,23 @@ class PlacementCanvas(QWidget):
         if cell is self.hovered_cell:
             return
         self.hovered_cell = cell
+        self.setToolTip(self._provenance_tooltip(cell) if cell is not None else "")
         self._update_interaction_cursor()
         self.update()
+
+    @staticmethod
+    def _provenance_tooltip(cell: PlacementCell) -> str:
+        if cell.is_reference_fallback:
+            return (
+                f"필요: {cell.required_role}\n"
+                f"대체 표시: {cell.rendered_source_role}\n"
+                f"Source: {cell.filename or '—'}"
+            )
+        if cell.assignment_identity is not None:
+            return f"{cell.required_role}\n{cell.filename or '—'}"
+        if cell.is_no_fit:
+            return f"필요: {cell.required_role}\n이 위치에 맞는 크기의 후보가 없습니다"
+        return f"필요: {cell.required_role}"
 
     def _update_interaction_cursor(self) -> None:
         if self._panning:
@@ -370,6 +419,75 @@ class PlacementCanvas(QWidget):
             if (x - 1, y) not in occupied:
                 painter.drawLine(QPointF(left, bottom), QPointF(left, top))
 
+    def _paint_actual(self, painter: QPainter, scale: float, origin: QPointF) -> None:
+        if self.result is None:
+            return
+        for cell in self.result.cells:
+            pixmap = self.pixmaps.get(cell.assignment_identity)
+            if cell.is_missing or pixmap is None or pixmap.isNull():
+                continue
+            xs, ys = zip(*cell.occupied_cells)
+            target = QRectF(
+                origin.x() + min(xs) * scale,
+                origin.y() + min(ys) * scale,
+                (max(xs) - min(xs) + 1) * scale,
+                (max(ys) - min(ys) + 1) * scale,
+            )
+            painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()))
+
+    def _paint_guides(self, painter: QPainter, scale: float, origin: QPointF) -> None:
+        if not self.guides_enabled:
+            return
+        painter.save()
+        painter.setOpacity(self.guide_opacity / 100.0)
+        for placement in self.guide_placements:
+            pixmap = self.guide_pixmaps.get(placement.asset)
+            if pixmap is None or pixmap.isNull() or not placement.occupied_cells:
+                continue
+            xs, ys = zip(*placement.occupied_cells)
+            # Preserve native pixels that extend above a logical footprint
+            # (notably Top Sequence artwork) by scaling from the 32 px
+            # reference cell and bottom-aligning to the occupied bounds.
+            native_width = pixmap.width() / 32.0 * scale
+            native_height = pixmap.height() / 32.0 * scale
+            bottom = origin.y() + (max(ys) + 1) * scale
+            target = QRectF(
+                origin.x() + min(xs) * scale,
+                bottom - native_height,
+                native_width,
+                native_height,
+            )
+            painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()))
+        painter.restore()
+
+    def _paint_diagnostics(self, painter: QPainter, scale: float, origin: QPointF) -> None:
+        if self.result is None:
+            return
+        for cell in self.result.cells:
+            if cell.is_missing or cell.is_no_fit:
+                for x, y in cell.occupied_cells:
+                    rect = QRectF(
+                        origin.x() + x * scale, origin.y() + y * scale, scale, scale,
+                    )
+                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor(176, 64, 64, 48))
+                    painter.setPen(QPen(QColor(218, 88, 78, 175), 1.5))
+                    painter.drawRect(rect.adjusted(2, 2, -2, -2))
+            if cell.fallback_severity == WARNING_FALLBACK:
+                for x, y in cell.occupied_cells:
+                    rect = QRectF(
+                        origin.x() + x * scale, origin.y() + y * scale, scale, scale,
+                    )
+                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor(210, 65, 65, 88))
+                    painter.setPen(QPen(self.warning_fallback_color, 2.0))
+                    painter.drawRect(rect.adjusted(2, 2, -2, -2))
+            elif cell.fallback_severity == ALLOWED_FALLBACK:
+                painter.setPen(QPen(self.allowed_fallback_color, 2.0))
+                for x, y in cell.occupied_cells:
+                    rect = QRectF(
+                        origin.x() + x * scale, origin.y() + y * scale, scale, scale,
+                    )
+                    painter.drawRect(rect.adjusted(2, 2, -2, -2))
+
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
@@ -381,23 +499,9 @@ class PlacementCanvas(QWidget):
             origin.x(), origin.y(), self.result.width * scale, self.result.height * scale,
         )
         painter.fillRect(field_rect, self.field_color)
-        for cell in self.result.cells:
-            for x, y in cell.occupied_cells:
-                rect = QRectF(origin.x() + x * scale, origin.y() + y * scale, scale, scale)
-                if cell.is_missing:
-                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor(176, 64, 64, 105))
-            pixmap = self.pixmaps.get(cell.assignment_identity)
-            if not cell.is_missing and pixmap is not None and not pixmap.isNull():
-                xs, ys = zip(*cell.occupied_cells)
-                target = QRectF(origin.x() + min(xs) * scale, origin.y() + min(ys) * scale,
-                                (max(xs) - min(xs) + 1) * scale,
-                                (max(ys) - min(ys) + 1) * scale)
-                painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()))
-            if cell.fallback_for is not None:
-                for x, y in cell.occupied_cells:
-                    rect = QRectF(origin.x() + x * scale, origin.y() + y * scale,
-                                  scale, scale)
-                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor(210, 65, 65, 88))
+        self._paint_guides(painter, scale, origin)
+        self._paint_actual(painter, scale, origin)
+        self._paint_diagnostics(painter, scale, origin)
         if self.show_grid:
             painter.setPen(QPen(QColor(235, 239, 242, 105), 1))
             for y in range(self.result.height):
@@ -411,10 +515,13 @@ class PlacementCanvas(QWidget):
 class PlacementPreviewWindow(QWidget):
     assignment_locate_requested = Signal(object)
     missing_role_locate_requested = Signal(str)
+    no_fit_role_requested = Signal(str)
+    fallback_role_locate_requested = Signal(object)
 
     def __init__(self, parent: QWidget,
                  source_provider: Callable[[], PlacementPreviewSource],
-                 app_icon: QIcon, theme: str) -> None:
+                 app_icon: QIcon, theme: str,
+                 preferences: Preferences | None = None) -> None:
         super().__init__(parent, Qt.WindowType.Window)
         self.setObjectName("placementPreviewWindow")
         self.setWindowTitle("TileNamer — 배치 미리보기")
@@ -423,6 +530,8 @@ class PlacementPreviewWindow(QWidget):
         self.setMinimumSize(640, 480)
         self.resize(820, 600)
         self.source_provider = source_provider
+        self.preferences = preferences or Preferences.default()
+        self.guide_registry = load_guide_registry()
         self.refresh_count = 0
         self._positioned = False
         self.refresh_timer = QTimer(self)
@@ -451,6 +560,25 @@ class PlacementPreviewWindow(QWidget):
         row.addWidget(QLabel("패턴"))
         self.pattern_combo = ContentAwareComboBox(objectName="placementPattern")
         row.addWidget(self.pattern_combo)
+        row.addSpacing(12)
+        self.guide_toggle = QPushButton(objectName="placementGuideToggle")
+        self.guide_toggle.setCheckable(True)
+        self.guide_toggle.setChecked(self.preferences.placement_guide_enabled)
+        row.addWidget(self.guide_toggle)
+        self.guide_opacity_label = QLabel(
+            "투명도", objectName="placementGuideOpacityLabel",
+        )
+        row.addWidget(self.guide_opacity_label)
+        self.guide_opacity_slider = QSlider(
+            Qt.Orientation.Horizontal, objectName="placementGuideOpacity",
+        )
+        self.guide_opacity_slider.setRange(5, 80)
+        self.guide_opacity_slider.setValue(self.preferences.placement_guide_opacity)
+        self.guide_opacity_slider.setFixedWidth(88)
+        row.addWidget(self.guide_opacity_slider)
+        self.guide_opacity_value = QLabel(objectName="placementGuideOpacityValue")
+        self.guide_opacity_value.setMinimumWidth(34)
+        row.addWidget(self.guide_opacity_value)
         row.addStretch(1)
         self.fit_button = QPushButton("맞춤", objectName="placementFit")
         self.zoom_out_button = QPushButton("−", objectName="placementZoomOut")
@@ -473,13 +601,17 @@ class PlacementPreviewWindow(QWidget):
         )
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.summary_label = QLabel("준비 0 / 0 · 누락 0", objectName="placementSummary")
+        self.summary_label = QLabel(
+            "준비 0 / 0 · 대체 0 · 누락 0", objectName="placementSummary",
+        )
         self.missing_label = QLabel("", objectName="placementMissing")
         self.missing_label.setWordWrap(True)
         outer.addWidget(self.summary_label)
         outer.addWidget(self.missing_label)
         self.family_combo.currentIndexChanged.connect(self._family_changed)
         self.pattern_combo.currentIndexChanged.connect(self._pattern_changed)
+        self.guide_toggle.toggled.connect(self._guide_toggled)
+        self.guide_opacity_slider.valueChanged.connect(self._guide_opacity_changed)
         self.grid_toggle.toggled.connect(self.canvas.set_grid_visible)
         self.canvas.tile_clicked.connect(self._canvas_tile_clicked)
         self.canvas.zoom_changed.connect(
@@ -487,7 +619,22 @@ class PlacementPreviewWindow(QWidget):
         self.zoom_out_button.clicked.connect(lambda: self.canvas.set_zoom(self.canvas.zoom / 1.25))
         self.zoom_in_button.clicked.connect(lambda: self.canvas.set_zoom(self.canvas.zoom * 1.25))
         self.fit_button.clicked.connect(self.canvas.fit_view)
+        self._guide_toggled(self.guide_toggle.isChecked())
+        self._guide_opacity_changed(self.guide_opacity_slider.value())
         self._family_changed()
+
+    def _guide_toggled(self, enabled: bool) -> None:
+        self.guide_toggle.setText("예시 ON" if enabled else "예시 OFF")
+        self.guide_opacity_label.setEnabled(enabled)
+        self.guide_opacity_slider.setEnabled(enabled)
+        self.guide_opacity_value.setEnabled(enabled)
+        self.preferences.placement_guide_enabled = enabled
+        self.canvas.set_guides_enabled(enabled)
+
+    def _guide_opacity_changed(self, value: int) -> None:
+        self.guide_opacity_value.setText(f"{value}%")
+        self.preferences.placement_guide_opacity = value
+        self.canvas.set_guide_opacity(value)
 
     def _family_changed(self, *_args) -> None:
         family = str(self.family_combo.currentData() or "Solid")
@@ -508,10 +655,12 @@ class PlacementPreviewWindow(QWidget):
             self.refresh_preview()
 
     def _canvas_tile_clicked(self, cell: PlacementCell) -> None:
-        if cell.fallback_for is not None:
-            self.missing_role_locate_requested.emit(cell.fallback_for)
+        if cell.is_reference_fallback:
+            self.fallback_role_locate_requested.emit(cell)
+        elif cell.is_no_fit:
+            self.no_fit_role_requested.emit(cell.required_category)
         elif cell.assignment_identity is None:
-            self.missing_role_locate_requested.emit(cell.category)
+            self.missing_role_locate_requested.emit(cell.required_category)
         else:
             self.assignment_locate_requested.emit(cell.assignment_identity)
 
@@ -584,22 +733,40 @@ class PlacementPreviewWindow(QWidget):
 
     def refresh_preview(self) -> None:
         source = self.source_provider()
-        if source.image is None or not any(source.model.all_assets()):
+        guide_placements: tuple[GuidePlacement, ...] = ()
+        if source.image is None:
             result = None
-            self.summary_label.setText("준비 0 / 0 · 누락 0")
+            self.summary_label.setText("준비 0 / 0 · 대체 0 · 누락 0")
             self.missing_label.clear()
             self.empty_label.show()
         else:
             family = str(self.family_combo.currentData() or "Solid")
             pattern = str(self.pattern_combo.currentData() or "종합")
             result = build_placement_result(family, source.model, pattern)
+            guide_placements = build_guide_placements(
+                family, pattern, self.guide_registry,
+            )
             self.summary_label.setText(
                 f"준비 {len(result.ready_roles)} / {len(result.required_roles)} · "
-                f"누락 {result.missing_cell_count}")
-            self.missing_label.setText("\n".join(
-                f"{category} ×{count}" for category, count in result.missing_counts))
+                f"대체 {result.fallback_cell_count} · 누락 {result.missing_cell_count}")
+            diagnostics = [
+                f"{category} ×{count}" for category, count in result.missing_counts
+            ]
+            diagnostics.extend(
+                f"{category} ×{count} — 이 위치에 맞는 크기의 후보가 없습니다"
+                for category, count in result.no_fit_counts
+            )
+            self.missing_label.setText("\n".join(diagnostics))
             self.empty_label.hide()
         self.canvas.set_preview(result, source)
+        self.canvas.set_guides(
+            guide_placements, self.guide_toggle.isChecked(),
+            self.guide_opacity_slider.value(),
+        )
+        self.guide_toggle.setToolTip(
+            "샘플 기반 예시 가이드 표시" if guide_placements
+            else "사용 가능한 예시 이미지가 없습니다"
+        )
         self.refresh_count += 1
 
     def update_alpha(self, colors) -> None:
@@ -614,6 +781,11 @@ class PlacementPreviewWindow(QWidget):
             #placementControls { background: %s; border: 1px solid %s; }
             QComboBox, QPushButton { min-height: 30px; background: %s; color: %s; border: 1px solid %s; }
             #placementControls QLabel, #placementControls QCheckBox { color: %s; background: transparent; }
+            #placementGuideToggle:checked { border: 1px solid #328b9d; }
+            QSlider::groove:horizontal { height: 4px; background: #70777e; }
+            QSlider::handle:horizontal { width: 12px; margin: -5px 0; background: #48aabc; border-radius: 6px; }
+            QSlider::groove:horizontal:disabled { background: #8a9096; }
+            QSlider::handle:horizontal:disabled { background: #a3a8ad; }
             #placementZoomLabel { color: %s; font-weight: 600; }
             #placementCanvas { background: #24272b; border: 1px solid %s; }
             #placementEmpty { color: #aeb4bb; background: transparent; }

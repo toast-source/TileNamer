@@ -41,11 +41,12 @@ from .image_loader import (
     LoadedSource, load_source_document,
 )
 from .model import AssetAssignment, AssignmentModel, normalized_region
-from .placement import AssignmentIdentity
+from .placement import AssignmentIdentity, PlacementCell
 from .placement_window import PlacementPreviewSource, PlacementPreviewWindow
 from .project import TileProject
 from .preferences import Preferences
 from .resources import application_icon
+from .theme import apply_application_theme
 from .thumbnail import build_assignment_thumbnail, decorate_thumbnail_selection
 
 ROLE_CATEGORY = int(Qt.ItemDataRole.UserRole)
@@ -1260,6 +1261,7 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         dark = self.preferences.theme == "dark"
+        apply_application_theme(QApplication.instance(), self.preferences.theme)
         dark_stylesheet = """
             #appRoot, #sidePanel { background: #25282c; color: #e2e5e8; }
             #topToolbar { background: #2c3035; border-bottom-color: #454b52; }
@@ -1308,8 +1310,12 @@ class MainWindow(QMainWindow):
             QMenu { background: #30343a; color: #e2e5e8; border: 1px solid #50565d; }
             QMenu::item:selected { background: #3979b9; color: white; }
             QDialog, QTextBrowser { background: #25282c; color: #e2e5e8; }
+            QStatusBar QLabel[statusTone="warning"] { color: #f2b66d; font-weight: 600; }
         """ if dark else ""
-        self.setStyleSheet(self._base_stylesheet + dark_stylesheet)
+        light_semantic_stylesheet = """
+            QStatusBar QLabel[statusTone="warning"] { color: #8a4b08; font-weight: 600; }
+        """ if not dark else ""
+        self.setStyleSheet(self._base_stylesheet + dark_stylesheet + light_semantic_stylesheet)
         with QSignalBlocker(self.light_theme_action), QSignalBlocker(self.dark_theme_action):
             self.light_theme_action.setChecked(not dark)
             self.dark_theme_action.setChecked(dark)
@@ -1356,7 +1362,7 @@ class MainWindow(QMainWindow):
         if self.placement_preview_window is None:
             self.placement_preview_window = PlacementPreviewWindow(
                 self, self._placement_preview_source, self.app_icon,
-                self.preferences.theme,
+                self.preferences.theme, self.preferences,
             )
             self.preview_data_changed.connect(
                 self.placement_preview_window.schedule_refresh
@@ -1372,6 +1378,12 @@ class MainWindow(QMainWindow):
             )
             self.placement_preview_window.missing_role_locate_requested.connect(
                 self._locate_preview_missing_role
+            )
+            self.placement_preview_window.no_fit_role_requested.connect(
+                self._locate_preview_no_fit_role
+            )
+            self.placement_preview_window.fallback_role_locate_requested.connect(
+                self._locate_preview_fallback_role
             )
         self.placement_preview_window.show()
         self.placement_preview_window.raise_()
@@ -1419,6 +1431,30 @@ class MainWindow(QMainWindow):
         self._stop_locate_flash()
         self.assignment_list.setCurrentRow(-1)
         self.statusBar().showMessage(f"이 타일이 필요합니다: {category}", 2200)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _locate_preview_fallback_role(self, cell: PlacementCell) -> None:
+        if not self._select_preview_category(cell.required_role):
+            return
+        self._stop_locate_flash()
+        self.assignment_list.setCurrentRow(-1)
+        self.statusBar().showMessage(
+            f"{cell.required_role}가 필요합니다. "
+            f"현재 {cell.filename or cell.rendered_source_role}을 대체 표시 중입니다.",
+            3200,
+        )
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _locate_preview_no_fit_role(self, category: str) -> None:
+        if not self._select_preview_category(category):
+            return
+        self._stop_locate_flash()
+        self.assignment_list.setCurrentRow(-1)
+        self.statusBar().showMessage("이 위치에 맞는 크기의 후보가 없습니다.", 2600)
         self.show()
         self.raise_()
         self.activateWindow()
@@ -2142,13 +2178,15 @@ class MainWindow(QMainWindow):
                 f"{source_name}  |  {image.width}×{image.height}  |  {grid_status}  |  "
                 f"{' / '.join(unavailable)} 선택 불가"
             )
-            self.warning.setStyleSheet("color: #9a5a16; font-weight: 600;")
+            self.warning.setProperty("statusTone", "warning")
         else:
             self.warning.setText(
                 f"{source_name}  |  {image.width}×{image.height}  |  {grid_status}  |  "
                 f"{image.width // 32}×{image.height // 32} 셀"
             )
-            self.warning.setStyleSheet("")
+            self.warning.setProperty("statusTone", "normal")
+        self.warning.style().unpolish(self.warning)
+        self.warning.style().polish(self.warning)
 
     def toggle_tile(self, column: int, row: int) -> None:
         self.assign_region(column, row, 1, 1)
@@ -2539,9 +2577,10 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "기준 격자에 자동 맞춤", "Aseprite 레이어가 있는 파일을 먼저 열어 주세요.")
             return
         labels = [label for label, _ in references]
-        label, accepted = QInputDialog.getItem(self, "기준 격자에 자동 맞춤", "기준 격자", labels, 0, False)
-        if not accepted:
+        dialog = self._create_auto_alignment_dialog(labels)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        label = dialog.textValue()
         reference = references[labels.index(label)][1]
         plan, skipped = self.auto_alignment_plan(reference)
         if not plan:
@@ -2562,10 +2601,18 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes:
             self.apply_auto_alignment(reference)
 
-    def _show_alignment_mismatch_if_needed(self) -> None:
-        mismatches = self.alignment_mismatches()
-        if not mismatches:
-            return
+    def _create_auto_alignment_dialog(self, labels: list[str]) -> QInputDialog:
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("기준 격자에 자동 맞춤")
+        dialog.setWindowIcon(self.app_icon)
+        dialog.setLabelText("기준 격자")
+        dialog.setComboBoxItems(labels)
+        dialog.setComboBoxEditable(False)
+        return dialog
+
+    def _create_alignment_mismatch_dialog(
+        self, mismatches: dict[str, tuple[int, int]],
+    ) -> tuple[QMessageBox, QPushButton, QPushButton, QPushButton]:
         names = {layer.identity: layer.name for layer in self._flatten_layers()}
         details = "\n".join(
             f"{names.get(identity, identity)}    X {offset[0]:+d}px / Y {offset[1]:+d}px"
@@ -2573,11 +2620,19 @@ class MainWindow(QMainWindow):
         )
         box = QMessageBox(self)
         box.setWindowTitle("레이어 격자 정렬 차이")
+        box.setWindowIcon(self.app_icon)
         box.setText(f"레이어의 타일 정렬 기준이 서로 다릅니다.\n\n{details}")
         keep = box.addButton("그대로 열기", QMessageBox.ButtonRole.RejectRole)
         choose = box.addButton("격자 기준 선택", QMessageBox.ButtonRole.ActionRole)
         correct = box.addButton("기준에 맞게 보정", QMessageBox.ButtonRole.AcceptRole)
         box.setDefaultButton(keep)
+        return box, keep, choose, correct
+
+    def _show_alignment_mismatch_if_needed(self) -> None:
+        mismatches = self.alignment_mismatches()
+        if not mismatches:
+            return
+        box, _keep, choose, correct = self._create_alignment_mismatch_dialog(mismatches)
         box.exec()
         if box.clickedButton() is choose:
             self.left_tabs.setCurrentIndex(1)

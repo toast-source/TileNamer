@@ -56,6 +56,28 @@ class Preferences:
     def last_export_directory(self, value: str) -> None:
         self.settings.setValue("export/last_directory", value)
 
+    @property
+    def placement_guide_enabled(self) -> bool:
+        return self.settings.value("placement_preview/guide_enabled", True, type=bool)
+
+    @placement_guide_enabled.setter
+    def placement_guide_enabled(self, value: bool) -> None:
+        self.settings.setValue("placement_preview/guide_enabled", bool(value))
+
+    @property
+    def placement_guide_opacity(self) -> int:
+        try:
+            value = int(self.settings.value("placement_preview/guide_opacity", 25))
+        except (TypeError, ValueError):
+            value = 25
+        return max(5, min(80, value))
+
+    @placement_guide_opacity.setter
+    def placement_guide_opacity(self, value: int) -> None:
+        self.settings.setValue(
+            "placement_preview/guide_opacity", max(5, min(80, int(value))),
+        )
+
     def alpha_colors(self) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int]]:
         presets = {
             "light": ((232, 234, 237, 255), (202, 206, 211, 255)),
