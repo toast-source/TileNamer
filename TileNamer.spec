@@ -10,6 +10,7 @@ a = Analysis(
     pathex=[str(PROJECT_ROOT / "src")],
     binaries=[],
     datas=[
+        (str(PROJECT_ROOT / "tile_names.json"), "."),
         (str(PROJECT_ROOT / "icon.ico"), "."),
         (str(PROJECT_ROOT / "icon.png"), "."),
         (str(PROJECT_ROOT / "src" / "tilenamer" / "assets" / "guides"), "guides"),
