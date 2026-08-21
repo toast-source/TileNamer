@@ -20,6 +20,7 @@ class TileProject:
     temporary_tags: list[str] = field(default_factory=list)
     layer_grid_origins: dict[str, tuple[int, int]] = field(default_factory=dict)
     layer_grid_manual_overrides: set[str] = field(default_factory=set)
+    export_base_directory: str | None = None
 
     def __post_init__(self) -> None:
         # v8 removed the runtime enable switch; a non-zero offset is always active.
@@ -27,7 +28,7 @@ class TileProject:
 
     def save(self, path: str | Path) -> None:
         payload = {
-            "format_version": 8,
+            "format_version": 9,
             "source_file": self.source_file,
             "tile_size": self.tile_size,
             "assignments": self.model.as_json(),
@@ -43,6 +44,7 @@ class TileProject:
                 for identity, origin in self.layer_grid_origins.items()
             },
             "layer_grid_manual_overrides": sorted(self.layer_grid_manual_overrides),
+            "export_base_directory": self.export_base_directory,
         }
         Path(path).write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -52,7 +54,7 @@ class TileProject:
     def load(cls, path: str | Path) -> "TileProject":
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
         version = payload.get("format_version")
-        if version not in (1, 2, 3, 4, 5, 6, 7, 8):
+        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9):
             raise ValueError("지원하지 않는 프로젝트 파일 버전입니다.")
         tile_size = int(payload["tile_size"])
         if tile_size <= 0:
@@ -92,6 +94,14 @@ class TileProject:
             # Older projects could only contain user-edited/final values and had no
             # provenance bit. Preserve them rather than replacing them on reload.
             manual_overrides.update(grid_origins)
+        export_base_directory = payload.get("export_base_directory")
+        if export_base_directory:
+            export_path = Path(str(export_base_directory))
+            if not export_path.is_absolute():
+                export_path = (Path(path).resolve().parent / export_path).resolve()
+            export_base_directory = str(export_path)
+        else:
+            export_base_directory = None
         return cls(
             str(payload["source_file"]), tile_size,
             AssignmentModel.from_json(payload.get("assignments", {})), visibility,
@@ -100,4 +110,5 @@ class TileProject:
             [str(value) for value in payload.get("temporary_tags", [])],
             grid_origins,
             manual_overrides,
+            export_base_directory,
         )

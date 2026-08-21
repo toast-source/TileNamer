@@ -155,7 +155,7 @@ def test_temporary_tags_project_v5_and_old_migration(tmp_path: Path) -> None:
     project.save(project_path)
     restored = TileProject.load(project_path)
     assert restored.temporary_tags == ["BossRoom_Pillar"]
-    assert json.loads(project_path.read_text(encoding="utf-8"))["format_version"] == 8
+    assert json.loads(project_path.read_text(encoding="utf-8"))["format_version"] == 9
 
     old_path = tmp_path / "old.tilenamer.json"
     payload = json.loads(project_path.read_text(encoding="utf-8"))

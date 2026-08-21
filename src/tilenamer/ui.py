@@ -5,13 +5,17 @@ import re
 from pathlib import Path
 
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import QEvent, QFileSystemWatcher, QPoint, QRectF, QSignalBlocker, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import (
+    QEvent, QFileSystemWatcher, QPoint, QRectF, QSignalBlocker, QSize, Qt, QTimer,
+    QUrl, Signal,
+)
 from PySide6.QtGui import (
-    QAction, QActionGroup, QColor, QFont, QIcon, QImage, QKeyEvent, QKeySequence,
-    QPainter, QPen, QPixmap, QUndoStack,
+    QAction, QActionGroup, QColor, QDesktopServices, QFont, QIcon, QImage,
+    QKeyEvent, QKeySequence, QPainter, QPen, QPixmap, QUndoStack,
 )
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QColorDialog, QDialog, QDialogButtonBox, QFileDialog,
+    QAbstractItemView, QApplication, QButtonGroup, QColorDialog, QDialog,
+    QDialogButtonBox, QFileDialog,
     QFrame, QGridLayout, QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QHeaderView, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QComboBox, QScrollArea, QSizePolicy, QSpinBox, QSplitter, QStackedWidget,
@@ -22,7 +26,10 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .config import CategoryRule, load_categories
 from .custom_tags import validate_temporary_tag
-from .exporter import build_export_plan, export_tiles, find_existing_collisions
+from .exporter import (
+    build_export_plan, effective_output_directory, export_tiles,
+    find_existing_collisions, output_asset_count,
+)
 from .history import (
     AlignmentStateCommand, AssignmentStateCommand, LayerVisibilityCommand,
     TemporaryTagStateCommand,
@@ -43,6 +50,48 @@ ROLE_CATEGORY = int(Qt.ItemDataRole.UserRole)
 ROLE_SEARCH = ROLE_CATEGORY + 1
 ROLE_LAYER_ID = ROLE_SEARCH + 1
 ROLE_TEMPORARY_TAG = ROLE_LAYER_ID + 1
+
+
+class UiTokens:
+    SPACE_XS = 4
+    SPACE_SM = 8
+    SPACE_MD = 12
+    SPACE_LG = 16
+    RADIUS = 4
+    CONTROL_HEIGHT = 32
+    PANEL_MIN_LEFT = 210
+    PANEL_MIN_RIGHT = 250
+    WINDOW_MIN_WIDTH = 1100
+    WINDOW_MIN_HEIGHT = 680
+
+
+class MiddleElideLabel(QLabel):
+    """A copy-friendly path label that keeps both ends visible."""
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._full_text = ""
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setFullText(text)
+
+    def setFullText(self, text: str) -> None:  # noqa: N802
+        self._full_text = text
+        self.setToolTip(text)
+        self._update_elide()
+
+    def fullText(self) -> str:  # noqa: N802
+        return self._full_text
+
+    def _update_elide(self) -> None:
+        available = max(0, self.contentsRect().width())
+        self.setText(self.fontMetrics().elidedText(
+            self._full_text, Qt.TextElideMode.ElideMiddle, available,
+        ))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._update_elide()
 
 
 def category_color(name: str) -> QColor:
@@ -537,6 +586,9 @@ class MainWindow(QMainWindow):
         self.model = AssignmentModel()
         self.source_image = None
         self.source_path: Path | None = None
+        self.project_path: Path | None = None
+        self.export_base_directory: Path | None = None
+        self._settings_dirty = False
         self.layers: tuple[AsepriteLayer, ...] = ()
         self.layer_visibility: dict[str, bool] = {}
         self.document_grid: GridReference | None = None
@@ -551,6 +603,7 @@ class MainWindow(QMainWindow):
         self.temporary_tags: list[str] = []
         self.source_revision = 0
         self.undo_stack = QUndoStack(self)
+        self.undo_stack.cleanChanged.connect(self._sync_project_dirty_state)
         self.file_watcher = QFileSystemWatcher(self)
         self.file_watcher.fileChanged.connect(self._source_file_changed)
         self.auto_reload_timer = QTimer(self)
@@ -571,7 +624,7 @@ class MainWindow(QMainWindow):
             if app is not None:
                 app.setWindowIcon(self.app_icon)
         self.setWindowTitle(f"TileNamer v{__version__}")
-        self.setMinimumSize(1200, 720)
+        self.setMinimumSize(UiTokens.WINDOW_MIN_WIDTH, UiTokens.WINDOW_MIN_HEIGHT)
         self.resize(1400, 850)
         self._build_actions()
         self._build_ui()
@@ -591,7 +644,16 @@ class MainWindow(QMainWindow):
         self.load_project_action = action("프로젝트 불러오기…", self.load_project)
         self.export_all_action = action("전체 내보내기…", self.export_all)
         self.export_current_action = action("현재 타일 내보내기…", self.export_current)
-        self.export_other_action = action("다른 폴더로 내보내기…", self.export_other_location)
+        self.export_other_action = action("다른 위치로 내보내기…", self.export_other_location)
+        self.change_output_action = action(
+            "출력 위치 변경…", self.choose_output_destination,
+            "프로젝트의 기본 타일 이미지 출력 위치 변경",
+        )
+        self.open_output_action = action(
+            "출력 폴더 열기", self.open_output_folder,
+            "현재 TileImages 출력 폴더를 Explorer에서 열기",
+        )
+        self.open_output_action.setEnabled(False)
         self.exit_action = action("종료", self.close)
 
         self.undo_action = self.undo_stack.createUndoAction(self, "실행 취소")
@@ -638,7 +700,13 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addActions((self.save_project_action, self.load_project_action))
         file_menu.addSeparator()
-        file_menu.addActions((self.export_all_action, self.export_current_action, self.export_other_action))
+        export_menu = file_menu.addMenu("내보내기")
+        export_menu.setObjectName("exportMenu")
+        export_menu.addActions((
+            self.export_all_action, self.export_current_action, self.export_other_action,
+        ))
+        export_menu.addSeparator()
+        export_menu.addActions((self.change_output_action, self.open_output_action))
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action)
 
@@ -676,8 +744,8 @@ class MainWindow(QMainWindow):
         self.toolbar_widget.setObjectName("topToolbar")
         toolbar = QHBoxLayout(self.toolbar_widget)
         self.toolbar_layout = toolbar
-        toolbar.setContentsMargins(10, 8, 10, 8)
-        toolbar.setSpacing(6)
+        toolbar.setContentsMargins(UiTokens.SPACE_MD, UiTokens.SPACE_SM, UiTokens.SPACE_MD, UiTokens.SPACE_SM)
+        toolbar.setSpacing(UiTokens.SPACE_SM)
 
         def add_button(text: str, action_value: QAction, object_name: str = "") -> QPushButton:
             button = QPushButton(text)
@@ -687,7 +755,7 @@ class MainWindow(QMainWindow):
             button.setToolTip(action_value.toolTip() or action_value.text().replace("…", ""))
             button.setEnabled(action_value.isEnabled())
             action_value.enabledChanged.connect(button.setEnabled)
-            button.setMinimumHeight(30)
+            button.setMinimumHeight(UiTokens.CONTROL_HEIGHT)
             toolbar.addWidget(button)
             return button
 
@@ -723,18 +791,20 @@ class MainWindow(QMainWindow):
         self.zoom_out_action = QAction("축소", self)
         self.zoom_out_action.triggered.connect(lambda: self._set_zoom(self.canvas.zoom / 2))
         self.zoom_out_button = add_button("−", self.zoom_out_action)
+        self.zoom_out_button.setObjectName("zoomControlButton")
         self.zoom_out_button.setAccessibleName("축소")
         self.zoom_out_button.setFixedWidth(34)
         self.zoom_label = QPushButton("100%")
         self.zoom_label.setObjectName("zoomLabel")
         self.zoom_label.setToolTip("100%로 재설정")
         self.zoom_label.clicked.connect(lambda: self._set_zoom(1.0))
-        self.zoom_label.setFlat(True)
+        self.zoom_label.setFlat(False)
         self.zoom_label.setFixedWidth(58)
         toolbar.addWidget(self.zoom_label)
         self.zoom_in_action = QAction("확대", self)
         self.zoom_in_action.triggered.connect(lambda: self._set_zoom(self.canvas.zoom * 2))
         self.zoom_in_button = add_button("+", self.zoom_in_action)
+        self.zoom_in_button.setObjectName("zoomControlButton")
         self.zoom_in_button.setAccessibleName("확대")
         self.zoom_in_button.setFixedWidth(34)
         self.toolbar_primary_buttons = (
@@ -748,10 +818,10 @@ class MainWindow(QMainWindow):
         self.main_splitter.setChildrenCollapsible(False)
         left = QWidget()
         left.setObjectName("sidePanel")
-        left.setMinimumWidth(210)
+        left.setMinimumWidth(UiTokens.PANEL_MIN_LEFT)
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(12, 12, 12, 12)
-        left_layout.setSpacing(9)
+        left_layout.setContentsMargins(*(UiTokens.SPACE_MD,) * 4)
+        left_layout.setSpacing(UiTokens.SPACE_SM)
         self.left_tabs = QTabWidget()
         self.left_tabs.setObjectName("leftTabs")
         tile_tab = QWidget()
@@ -776,20 +846,23 @@ class MainWindow(QMainWindow):
         self.category_tree.currentItemChanged.connect(self._category_changed)
         tile_layout.addWidget(self.category_tree)
         self.add_tag_button = QPushButton("+ 임시 태그")
+        self.add_tag_button.setObjectName("temporaryTagButton")
         self.add_tag_button.setToolTip("프로젝트 전용 임시 태그 추가")
         self.add_tag_button.clicked.connect(self.prompt_add_temporary_tag)
-        self.add_tag_button.setMinimumHeight(28)
+        self.add_tag_button.setMinimumHeight(UiTokens.CONTROL_HEIGHT)
         tile_layout.addWidget(self.add_tag_button)
         tag_actions = QHBoxLayout()
         self.rename_tag_button = QPushButton("이름 변경")
+        self.rename_tag_button.setObjectName("temporaryTagButton")
         self.rename_tag_button.setToolTip("선택한 임시 태그 이름 변경")
         self.rename_tag_button.clicked.connect(self.prompt_rename_temporary_tag)
         self.delete_tag_button = QPushButton("삭제")
+        self.delete_tag_button.setObjectName("temporaryTagButton")
         self.delete_tag_button.setToolTip("선택한 임시 태그 삭제")
         self.delete_tag_button.clicked.connect(self.delete_selected_temporary_tag)
         for button in (self.rename_tag_button, self.delete_tag_button):
-            button.setMinimumHeight(28)
-            tag_actions.addWidget(button)
+            button.setMinimumHeight(UiTokens.CONTROL_HEIGHT)
+            tag_actions.addWidget(button, 1)
         tile_layout.addLayout(tag_actions)
         self.temporary_tag_buttons = (
             self.add_tag_button, self.rename_tag_button, self.delete_tag_button,
@@ -933,13 +1006,14 @@ class MainWindow(QMainWindow):
         center_layout = QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
-        selection_bar = QWidget()
-        selection_bar.setObjectName("selectionBar")
-        selection_layout = QHBoxLayout(selection_bar)
-        selection_layout.setContentsMargins(10, 5, 10, 5)
-        selection_layout.setSpacing(7)
-        selection_layout.addWidget(QLabel("선택 방식"))
-        self.selection_mode_combo = QComboBox()
+        self.selection_control = QFrame()
+        self.selection_control.setObjectName("selectionControl")
+        selection_layout = QHBoxLayout(self.selection_control)
+        selection_layout.setContentsMargins(
+            UiTokens.SPACE_XS, 2, UiTokens.SPACE_XS, 2,
+        )
+        selection_layout.setSpacing(0)
+        self.selection_mode_combo = QComboBox(center)
         self.selection_mode_combo.addItem("사각형", "rectangle")
         self.selection_mode_combo.addItem("셀 그리기", "paint")
         self.selection_mode_combo.setToolTip(
@@ -947,21 +1021,59 @@ class MainWindow(QMainWindow):
             "셀 그리기 중 Ctrl을 누르면 지나가는 셀을 제거합니다."
         )
         self.selection_mode_combo.currentIndexChanged.connect(self._selection_mode_changed)
-        selection_layout.addWidget(self.selection_mode_combo)
-        selection_layout.addStretch(1)
-        center_layout.addWidget(selection_bar)
+        self.selection_mode_combo.hide()
+        self.selection_mode_segment = QWidget()
+        self.selection_mode_segment.setObjectName("selectionModeSegment")
+        segment_layout = QHBoxLayout(self.selection_mode_segment)
+        segment_layout.setContentsMargins(0, 0, 0, 0)
+        segment_layout.setSpacing(0)
+        self.selection_mode_group = QButtonGroup(self)
+        self.selection_mode_group.setExclusive(True)
+        self.rectangle_mode_button = QPushButton("사각형")
+        self.paint_mode_button = QPushButton("셀 그리기")
+        self.selection_mode_buttons = {
+            "rectangle": self.rectangle_mode_button,
+            "paint": self.paint_mode_button,
+        }
+        for mode, button in self.selection_mode_buttons.items():
+            button.setCheckable(True)
+            button.setProperty("segment", True)
+            button.setMinimumHeight(UiTokens.CONTROL_HEIGHT)
+            button.clicked.connect(
+                lambda checked=False, value=mode: self._set_selection_mode(value)
+            )
+            self.selection_mode_group.addButton(button)
+            segment_layout.addWidget(button)
+        self.rectangle_mode_button.setChecked(True)
+        self.selection_mode_segment.setToolTip(self.selection_mode_combo.toolTip())
+        selection_layout.addWidget(self.selection_mode_segment)
+        self.center_tool_row = QWidget()
+        self.center_tool_row.setObjectName("centerToolRow")
+        self.center_tool_row.setFixedHeight(38)
+        center_tools = QHBoxLayout(self.center_tool_row)
+        center_tools.setContentsMargins(UiTokens.SPACE_SM, 0, UiTokens.SPACE_SM, 0)
+        center_tools.setSpacing(0)
+        center_tools.addStretch(1)
+        center_tools.addWidget(self.selection_control)
+        center_layout.addWidget(self.center_tool_row)
         center_layout.addWidget(self.viewport_stack, 1)
         self.main_splitter.addWidget(center)
 
         right = QWidget()
         right.setObjectName("sidePanel")
-        right.setMinimumWidth(250)
+        right.setMinimumWidth(UiTokens.PANEL_MIN_RIGHT)
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(12, 12, 12, 12)
-        right_layout.setSpacing(8)
+        right_layout.setContentsMargins(*(UiTokens.SPACE_MD,) * 4)
+        right_layout.setSpacing(UiTokens.SPACE_SM)
+        right_header = QHBoxLayout()
         right_title = QLabel("등록된 타일")
         right_title.setObjectName("panelTitle")
-        right_layout.addWidget(right_title)
+        right_header.addWidget(right_title)
+        right_header.addStretch(1)
+        self.total_assignment_label = QLabel("0")
+        self.total_assignment_label.setObjectName("headerCount")
+        right_header.addWidget(self.total_assignment_label)
+        right_layout.addLayout(right_header)
         self.current_label = QLabel("카테고리를 선택하세요")
         self.current_label.setObjectName("assignmentCategory")
         right_layout.addWidget(self.current_label)
@@ -991,11 +1103,46 @@ class MainWindow(QMainWindow):
             button = QPushButton(text)
             if object_name:
                 button.setObjectName(object_name)
-            button.setMinimumHeight(30)
+            button.setMinimumHeight(UiTokens.CONTROL_HEIGHT)
             button.clicked.connect(callback)
-            controls.addWidget(button)
+            controls.addWidget(button, 1)
             self.right_control_buttons.append(button)
         right_layout.addLayout(controls)
+
+        output_separator = QFrame()
+        output_separator.setFrameShape(QFrame.Shape.HLine)
+        output_separator.setObjectName("sectionSeparator")
+        right_layout.addWidget(output_separator)
+        self.output_section = QWidget()
+        self.output_section.setObjectName("outputSection")
+        output_layout = QVBoxLayout(self.output_section)
+        output_layout.setContentsMargins(0, 0, 0, 0)
+        output_layout.setSpacing(UiTokens.SPACE_XS)
+        output_header = QHBoxLayout()
+        output_title = QLabel("출력")
+        output_title.setObjectName("panelSectionTitle")
+        output_header.addWidget(output_title)
+        output_header.addStretch(1)
+        self.output_summary_label = QLabel("0 PNG")
+        self.output_summary_label.setObjectName("outputSummary")
+        output_header.addWidget(self.output_summary_label)
+        output_layout.addLayout(output_header)
+        self.output_path_label = MiddleElideLabel("출력 위치가 지정되지 않았습니다.")
+        self.output_path_label.setObjectName("outputPath")
+        output_layout.addWidget(self.output_path_label)
+        output_actions = QHBoxLayout()
+        output_actions.setSpacing(UiTokens.SPACE_SM)
+        self.change_output_button = QPushButton("출력 위치 선택")
+        self.change_output_button.clicked.connect(self.change_output_action.trigger)
+        self.open_output_button = QPushButton("폴더 열기")
+        self.open_output_button.clicked.connect(self.open_output_action.trigger)
+        self.open_output_button.setEnabled(False)
+        self.open_output_action.enabledChanged.connect(self.open_output_button.setEnabled)
+        for button in (self.change_output_button, self.open_output_button):
+            button.setMinimumHeight(UiTokens.CONTROL_HEIGHT)
+            output_actions.addWidget(button, 1)
+        output_layout.addLayout(output_actions)
+        right_layout.addWidget(self.output_section)
         self.main_splitter.addWidget(right)
         self.main_splitter.setStretchFactor(0, 0)
         self.main_splitter.setStretchFactor(1, 1)
@@ -1005,25 +1152,40 @@ class MainWindow(QMainWindow):
 
         self.setStyleSheet(
             """
-            #appRoot { background: #e8eaed; }
-            #topToolbar { background: #f5f6f7; border-bottom: 1px solid #c7cbd0; }
-            #selectionBar { background: #eceff2; border-bottom: 1px solid #c7cbd0; }
-            #topToolbar QPushButton { padding: 3px 11px; }
+            #appRoot { background: #dfe3e7; }
+            #topToolbar { background: #f1f3f5; border-bottom: 1px solid #969fa8; }
+            #centerToolRow { background: #e9ecef; border-bottom: 1px solid #9da5ae; }
+            QPushButton {
+                min-height: 32px; padding: 0 11px; border-radius: 4px;
+                color: #2f353b; background: #f3f5f6; border: 1px solid #9da5ae;
+            }
+            QPushButton:hover { background: #e2edf7; border-color: #568fc1; }
+            QPushButton:pressed { background: #ccddea; border-color: #4c82b1; }
+            QPushButton:disabled { color: #9299a0; background: #e4e7e9; border-color: #bcc2c7; }
             #topToolbar QPushButton#primaryButton { font-weight: 600; }
-            #topToolbar QPushButton#historyButton { padding: 0; color: #25313a; }
-            #topToolbar QPushButton#historyButton:disabled { color: #a8adb2; background: #eceeef; }
-            #toolbarSeparator { color: #c6c9cd; }
-            #zoomLabel { color: #34383d; font-weight: 600; }
-            #sidePanel { background: #f2f3f4; }
+            #topToolbar QPushButton#historyButton { padding: 0; color: #303940; background: #eef1f3; border: 1px solid #929ba4; }
+            #topToolbar QPushButton#historyButton:disabled { color: #8c949b; background: #e1e4e7; border-color: #aeb5bb; }
+            #topToolbar QPushButton#zoomControlButton, #topToolbar QPushButton#zoomLabel {
+                color: #30373d; background: #eef1f3; border: 1px solid #929ba4;
+            }
+            #toolbarSeparator { color: #929ba4; }
+            #zoomLabel { font-weight: 600; }
+            #sidePanel { background: #eef0f2; }
             #panelTitle { color: #25292e; font-size: 15px; font-weight: 700; }
+            #headerCount { color: #697079; font-size: 15px; font-weight: 700; }
             #assignmentCategory { color: #30343a; font-weight: 600; }
             #assignmentCount { color: #697079; }
             #panelSectionTitle { color: #34393f; font-weight: 700; }
             #selectedLayerName { color: #2e6088; font-weight: 600; padding: 2px 0 4px 0; }
-            #sectionSeparator { color: #d0d3d7; max-height: 1px; margin-top: 3px; }
-            QLineEdit { padding: 4px 8px; border: 1px solid #bfc4ca; border-radius: 3px; background: white; }
+            #sectionSeparator { color: #a7afb7; max-height: 1px; margin-top: 3px; }
+            QLineEdit, QComboBox, QSpinBox {
+                min-height: 32px; color: #2f353b; background: #ffffff;
+                border: 1px solid #929ba4; border-radius: 4px;
+            }
+            QLineEdit { padding: 4px 8px; }
             QLineEdit:focus { border-color: #4d86c6; }
-            QTreeWidget, QListWidget { border: 1px solid #d0d3d7; background: #f8f9fa; outline: 0; }
+            QTreeWidget, QListWidget { border: 1px solid #a5adb5; background: #f8f9fa; outline: 0; }
+            QTabWidget::pane { border: 1px solid #a5adb5; }
             QTreeWidget::item { min-height: 27px; padding: 1px 3px; }
             QTreeWidget::item:hover, QListWidget::item:hover { background: #e8f0fa; }
             QTreeWidget::item:selected, QListWidget::item:selected { background: #3979b9; color: white; }
@@ -1032,16 +1194,25 @@ class MainWindow(QMainWindow):
                 background: #3274ad; color: white;
                 border-left: 4px solid #46e1f5;
             }
-            #assignmentEmpty { color: #727981; border: 1px solid #d7dade; background: #f7f8f9; }
+            #assignmentEmpty { color: #727981; background: #f2f3f4; }
             QPushButton#removeButton { color: #a22d2d; }
-            QSplitter::handle { background: #c4c8cd; width: 2px; }
+            #selectionControl { background: #e4e8eb; border: 1px solid #949da6; border-radius: 5px; }
+            #selectionModeSegment { border: 1px solid #949da6; border-radius: 4px; }
+            #selectionModeSegment QPushButton { border: 0; border-radius: 0; padding: 0 14px; background: #e5e9ec; color: #30363c; }
+            #selectionModeSegment QPushButton:checked { background: #287fb4; color: white; font-weight: 600; }
+            #selectionModeSegment QPushButton:hover:!checked { background: #dce8f1; }
+            #selectionModeSegment QPushButton:disabled { background: #eceeef; color: #a0a6ac; }
+            QSplitter::handle { background: #969fa8; width: 2px; }
             QSplitter::handle:hover { background: #4d86c6; }
             QScrollArea#viewportScroll { background: #24272b; }
             QScrollArea#viewportScroll > QWidget > QWidget { background: #24272b; }
-            #viewportStack, #viewportEmpty { background: #24272b; }
-            #viewportEmpty { color: #aeb4bb; font-size: 13px; }
+            #viewportStack { background: #24272b; border: 1px solid #737b84; }
+            #viewportEmpty { color: #aeb4bb; background: #24272b; border: 0; font-size: 13px; }
             #viewportEmpty[dropActive="true"] { color: #ffffff; background: #31587d; border: 2px solid #77b7ee; }
-            QStatusBar { background: #f2f3f4; border-top: 1px solid #c5c9ce; }
+            #outputSection { background: transparent; }
+            #outputPath { color: #40464d; font-weight: 600; }
+            #outputSummary { color: #6d747c; font-size: 11px; }
+            QStatusBar { background: #eef0f2; border-top: 1px solid #969fa8; }
             QStatusBar QLabel { color: #444a51; padding: 3px 8px; }
             """
         )
@@ -1061,13 +1232,27 @@ class MainWindow(QMainWindow):
         dark_stylesheet = """
             #appRoot, #sidePanel { background: #25282c; color: #e2e5e8; }
             #topToolbar { background: #2c3035; border-bottom-color: #454b52; }
-            #topToolbar QPushButton, QComboBox, QSpinBox, QLineEdit {
+            #centerToolRow { background: #292e33; border-bottom-color: #4d555d; }
+            QPushButton, QComboBox, QSpinBox, QLineEdit {
                 background: #343940; color: #e4e7ea; border: 1px solid #555c64;
             }
-            #topToolbar QPushButton:disabled, QPushButton:disabled, QSpinBox:disabled {
-                color: #777e86; background: #2b2f34;
+            QPushButton:hover { background: #414951; border-color: #687582; }
+            QPushButton:pressed { background: #293038; }
+            QPushButton:disabled, QSpinBox:disabled { color: #777e86; background: #2a2e33; border-color: #3e444a; }
+            #topToolbar QPushButton#historyButton {
+                color: #f0f3f5; background: #343a40; border-color: #59626b;
             }
-            #panelTitle, #panelSectionTitle, #assignmentCategory { color: #eef1f3; }
+            #topToolbar QPushButton#historyButton:disabled {
+                color: #9ca4ac; background: #2f3439; border-color: #4e565e;
+            }
+            #topToolbar QPushButton#zoomControlButton, #topToolbar QPushButton#zoomLabel {
+                color: #f2f4f6; background: #343a40; border-color: #5c6570;
+            }
+            #topToolbar QPushButton#zoomControlButton:hover, #topToolbar QPushButton#zoomLabel:hover {
+                color: #ffffff; background: #414951; border-color: #74808b;
+            }
+            #panelTitle, #panelSectionTitle, #assignmentCategory, #outputPath { color: #eef1f3; }
+            #headerCount { color: #aab0b7; }
             #assignmentCount { color: #aab0b7; }
             #selectedLayerName { color: #70cfee; }
             QTreeWidget, QListWidget { background: #2b2f34; color: #dfe3e7; border-color: #4b5158; }
@@ -1076,6 +1261,14 @@ class MainWindow(QMainWindow):
             QTabBar::tab { background: #30343a; color: #bec4ca; padding: 6px 8px; }
             QTabBar::tab:selected { background: #3a4047; color: white; }
             #assignmentEmpty { color: #aeb4bb; border-color: #4b5158; background: #2b2f34; }
+            #selectionControl { background: #30363b; border-color: #555d65; }
+            #selectionModeSegment { border-color: #59616a; }
+            #selectionModeSegment QPushButton { color: #d9dde1; background: #343a40; }
+            #selectionModeSegment QPushButton:checked { background: #2786ad; color: white; }
+            #selectionModeSegment QPushButton:hover:!checked { background: #3a424a; }
+            #selectionModeSegment QPushButton:disabled { background: #292e33; color: #6f767d; }
+            #outputSection { background: transparent; }
+            #outputSummary { color: #aab0b7; }
             #sectionSeparator { color: #474d54; }
             QStatusBar { background: #2d3136; border-top-color: #484e55; }
             QStatusBar QLabel { color: #d2d6da; }
@@ -1210,6 +1403,26 @@ class MainWindow(QMainWindow):
     def _selection_mode_changed(self, index: int) -> None:
         mode = self.selection_mode_combo.itemData(index) or "rectangle"
         self.canvas.set_selection_mode(str(mode))
+        button = self.selection_mode_buttons.get(str(mode))
+        if button is not None:
+            button.setChecked(True)
+
+    def _set_selection_mode(self, mode: str) -> None:
+        index = self.selection_mode_combo.findData(mode)
+        if index >= 0:
+            self.selection_mode_combo.setCurrentIndex(index)
+
+    @property
+    def project_dirty(self) -> bool:
+        return self._settings_dirty or not self.undo_stack.isClean()
+
+    def _sync_project_dirty_state(self, clean: bool | None = None) -> None:
+        suffix = " *" if self.project_dirty else ""
+        self.setWindowTitle(f"TileNamer v{__version__}{suffix}")
+
+    def _mark_settings_dirty(self) -> None:
+        self._settings_dirty = True
+        self._sync_project_dirty_state()
 
     def _zoom_by_at(self, factor: float, anchor: QPoint) -> None:
         self._set_zoom(self.canvas.zoom * factor, anchor)
@@ -1864,6 +2077,7 @@ class MainWindow(QMainWindow):
         assets = self.model.assets(category) if category else []
         self.current_label.setText(self._display_category(category))
         self.assignment_count_label.setText(f"{len(assets)}개")
+        self.total_assignment_label.setText(str(output_asset_count(self.model)))
         self.assignment_empty.setVisible(not assets)
         self.assignment_list.setVisible(bool(assets))
         with QSignalBlocker(self.assignment_list):
@@ -1890,6 +2104,7 @@ class MainWindow(QMainWindow):
                         f"논리 크기 {asset.width_cells}×{asset.height_cells}\n"
                         f"선택 셀 {asset.cell_count}개\n"
                         f"출력 크기 {asset.output_width_px}×{asset.output_height_px}"
+                        f"{self._assignment_output_tooltip(rule, index)}"
                     )
                     self.assignment_list.addItem(item)
             self._assignment_list_category = category
@@ -1897,7 +2112,14 @@ class MainWindow(QMainWindow):
                 self.assignment_list.setCurrentRow(previous_row)
         self._assignment_row_changed(self.assignment_list.currentRow())
         self._update_tree_counts()
+        self._update_output_bar()
         self.canvas.update()
+
+    def _assignment_output_tooltip(self, rule: CategoryRule, index: int) -> str:
+        if self.export_base_directory is None:
+            return "\nOutput: 출력 위치 미지정"
+        output = self.export_base_directory / rule.subfolder / rule.filename(index)
+        return f"\nOutput: {output}"
 
     def _assignment_row_changed(self, row: int) -> None:
         self.canvas.set_selected_assignment(row)
@@ -2463,6 +2685,80 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("레이어 정렬 미리보기를 렌더링하지 못했습니다.", 5000)
         return restored
 
+    def effective_output_path(self) -> Path | None:
+        if self.export_base_directory is None:
+            return None
+        return effective_output_directory(self.export_base_directory, self.rules)
+
+    def set_export_base_directory(
+        self, path: str | Path | None, *, mark_dirty: bool = True,
+    ) -> None:
+        resolved = Path(path).resolve() if path else None
+        if resolved == self.export_base_directory:
+            return
+        self.export_base_directory = resolved
+        if resolved is not None:
+            self.preferences.last_export_directory = str(resolved)
+        if mark_dirty:
+            self._mark_settings_dirty()
+        self._update_output_bar()
+        self.refresh_assignments()
+
+    def choose_output_destination(self) -> bool:
+        initial = str(self.export_base_directory or self.preferences.last_export_directory)
+        output = QFileDialog.getExistingDirectory(self, "기본 출력 위치 선택", initial)
+        if not output:
+            return False
+        self.set_export_base_directory(output)
+        self.statusBar().showMessage("프로젝트의 기본 출력 위치를 변경했습니다.", 5000)
+        return True
+
+    def _update_output_bar(self) -> None:
+        if not hasattr(self, "output_path_label"):
+            return
+        count = output_asset_count(self.model)
+        effective = self.effective_output_path()
+        if effective is None:
+            self.output_path_label.setFullText("출력 위치가 지정되지 않았습니다.")
+            summary = f"{count} PNG"
+            enabled = False
+            button_text = "출력 위치 선택"
+        else:
+            self.output_path_label.setFullText(str(effective))
+            collisions = 0
+            if count:
+                try:
+                    collisions = len(find_existing_collisions(
+                        build_export_plan(self.export_base_directory, self.model, self.rules)
+                    ))
+                except (OSError, ValueError):
+                    collisions = 0
+            summary = f"{count} PNG"
+            if collisions:
+                summary += f" · 기존 {collisions}개"
+            enabled = True
+            button_text = "위치 변경"
+        self.output_summary_label.setText(summary)
+        self.open_output_action.setEnabled(enabled)
+        self.change_output_button.setText(button_text)
+        source_text = str(self.source_path) if self.source_path else "열리지 않음"
+        project_text = str(self.project_path) if self.project_path else "저장되지 않음"
+        output_text = str(effective) if effective else "지정되지 않음"
+        self.output_section.setToolTip(
+            f"Source: {source_text}\nProject: {project_text}\nOutput: {output_text}"
+        )
+
+    def open_output_folder(self) -> None:
+        effective = self.effective_output_path()
+        if effective is None:
+            QMessageBox.information(self, "출력 폴더", "먼저 출력 위치를 선택해 주세요.")
+            return
+        target = effective
+        while not target.exists() and target != target.parent:
+            target = target.parent
+        if not target.exists() or not QDesktopServices.openUrl(QUrl.fromLocalFile(str(target))):
+            QMessageBox.warning(self, "출력 폴더", f"폴더를 열 수 없습니다.\n\n{effective}")
+
     def save_project(self) -> None:
         if self.source_path is None:
             QMessageBox.information(self, "저장", "먼저 원본 이미지를 열어 주세요.")
@@ -2472,11 +2768,24 @@ class MainWindow(QMainWindow):
             if not path.lower().endswith(".tilenamer.json"):
                 path += ".tilenamer.json"
             TileProject(
-                str(self.source_path), 32, self.model, self.layer_visibility,
-                self.grid_reference, self.layer_alignment_offsets,
-                True, self.temporary_tags,
-                self.layer_grid_origins, self.layer_grid_manual_overrides,
+                source_file=str(self.source_path), tile_size=32, model=self.model,
+                layer_visibility=self.layer_visibility,
+                grid_reference=self.grid_reference,
+                layer_alignment_offsets=self.layer_alignment_offsets,
+                alignment_correction_enabled=True,
+                temporary_tags=self.temporary_tags,
+                layer_grid_origins=self.layer_grid_origins,
+                layer_grid_manual_overrides=self.layer_grid_manual_overrides,
+                export_base_directory=(
+                    str(self.export_base_directory)
+                    if self.export_base_directory is not None else None
+                ),
             ).save(path)
+            self.project_path = Path(path).resolve()
+            self._settings_dirty = False
+            self.undo_stack.setClean()
+            self._sync_project_dirty_state()
+            self._update_output_bar()
             self.statusBar().showMessage(f"프로젝트 저장: {path}", 5000)
 
     def load_project(self) -> None:
@@ -2517,6 +2826,11 @@ class MainWindow(QMainWindow):
             self.layer_grid_origins = dict(project.layer_grid_origins)
             self.layer_grid_manual_overrides = set(project.layer_grid_manual_overrides)
             self.layer_alignment_offsets = dict(project.layer_alignment_offsets)
+            self.project_path = Path(path).resolve()
+            self.export_base_directory = (
+                Path(project.export_base_directory).resolve()
+                if project.export_base_directory else None
+            )
             self._apply_source(
                 source_path, candidate, keep_assignments=True,
                 preserve_grid_settings=True,
@@ -2527,6 +2841,10 @@ class MainWindow(QMainWindow):
                 target = next(iter(self.category_items.values()))
             if target is not None:
                 self.category_tree.setCurrentItem(target)
+            self._settings_dirty = False
+            self.undo_stack.setClean()
+            self._sync_project_dirty_state()
+            self._update_output_bar()
         except Exception as error:
             QMessageBox.critical(self, "프로젝트 불러오기 실패", str(error))
 
@@ -2537,18 +2855,26 @@ class MainWindow(QMainWindow):
         self._export(self.current_category())
 
     def export_other_location(self) -> None:
-        self._export(None, "다른 폴더로 전체 내보내기")
-
-    def _export(self, category: str | None, title: str = "타일 세트 폴더 선택") -> None:
         if self.source_image is None:
             QMessageBox.information(self, "내보내기", "먼저 원본 이미지를 열어 주세요.")
             return
         output = QFileDialog.getExistingDirectory(
-            self, title, self.preferences.last_export_directory
+            self, "다른 위치로 전체 내보내기", self.preferences.last_export_directory
         )
         if not output:
             return
         self.preferences.last_export_directory = output
+        self._run_export(None, Path(output))
+
+    def _export(self, category: str | None) -> None:
+        if self.source_image is None:
+            QMessageBox.information(self, "내보내기", "먼저 원본 이미지를 열어 주세요.")
+            return
+        if self.export_base_directory is None and not self.choose_output_destination():
+            return
+        self._run_export(category, self.export_base_directory)
+
+    def _run_export(self, category: str | None, output: Path) -> None:
         try:
             plan = build_export_plan(output, self.model, self.rules, category)
             if not plan:
@@ -2572,6 +2898,7 @@ class MainWindow(QMainWindow):
             written = export_tiles(
                 self.source_image, plan, overwrite=overwrite, grid=self.grid_reference
             )
+            self._update_output_bar()
             QMessageBox.information(self, "내보내기 완료", f"PNG 에셋 {len(written)}개를 생성했습니다.")
         except Exception as error:
             QMessageBox.critical(self, "내보내기 실패", str(error))

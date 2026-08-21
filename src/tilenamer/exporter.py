@@ -21,6 +21,24 @@ class ExportItem:
         return self.assignment.origin
 
 
+def effective_output_directory(
+    output_root: str | Path, rules: list[CategoryRule],
+) -> Path:
+    """Return the folder that directly contains exported PNG files.
+
+    TileNamer's current category configuration uses one shared subfolder. If a
+    future configuration uses several folders, the base itself is the only
+    truthful common destination.
+    """
+    root = Path(output_root)
+    subfolders = {rule.subfolder for rule in rules if rule.subfolder}
+    return root / next(iter(subfolders)) if len(subfolders) == 1 else root
+
+
+def output_asset_count(model: AssignmentModel) -> int:
+    return sum(1 for _ in model.all_assets())
+
+
 def build_export_plan(output_root: str | Path, model: AssignmentModel,
                       rules: list[CategoryRule], category: str | None = None) -> list[ExportItem]:
     root = Path(output_root)

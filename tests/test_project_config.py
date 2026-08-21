@@ -37,7 +37,7 @@ def test_project_round_trip(tmp_path: Path) -> None:
     assert restored.tile_size == 32
     assert restored.model.assignments == original.model.assignments
     assert restored.layer_visibility == original.layer_visibility
-    assert '"format_version": 8' in path.read_text(encoding="utf-8")
+    assert '"format_version": 9' in path.read_text(encoding="utf-8")
 
 
 def test_v1_project_migrates_coordinates_to_1x1_assets(tmp_path: Path) -> None:

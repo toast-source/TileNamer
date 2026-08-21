@@ -150,13 +150,13 @@ def test_v8_project_shape_and_v1_through_v7_rectangle_migration(tmp_path: Path) 
     )
     project.save(path)
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["format_version"] == 8
+    assert payload["format_version"] == 9
     restored = TileProject.load(path)
     assert restored.temporary_tags == ["Special_LCorner"]
     assert restored.model.assets("Special_LCorner")[0].selected_cells == L_CELLS
     assert restored.model.assets("Special_LCorner")[1].origin == (4, 0)
 
-    for version in range(1, 8):
+    for version in range(1, 9):
         old = tmp_path / f"v{version}.json"
         assignments = {"A": [[2, 3]]} if version == 1 else {
             "A": [{"x_cell": 2, "y_cell": 3, "width_cells": 2, "height_cells": 2}]

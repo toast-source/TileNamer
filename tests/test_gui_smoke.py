@@ -104,7 +104,7 @@ def test_editor_layout_and_assignment_hierarchy(tmp_path: Path) -> None:
     window.show()
     app.processEvents()
     sizes = window.main_splitter.sizes()
-    assert window.windowTitle() == "TileNamer v0.1.4"
+    assert window.windowTitle() == "TileNamer v0.1.5 *"
     assert len(sizes) == 3 and sizes[1] > sizes[0] and sizes[1] > sizes[2]
     assert window.current_label.text() == "Platform Center"
     assert window.assignment_count_label.text() == "1개"

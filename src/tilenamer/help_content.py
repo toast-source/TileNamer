@@ -64,10 +64,14 @@ Assignment와 작업 상태는 유지됩니다.</p>
 
 <h2>12. 프로젝트 저장 / 불러오기</h2>
 <p>Source 경로, Assignment와 후보 순서, 임시 태그, Grid Reference, Layer 표시 상태,
-Layer position correction을 저장하고 복원합니다.</p>
+Layer position correction과 기본 출력 위치를 저장하고 복원합니다. 프로젝트 파일은 TileNamer의
+작업 설정을 저장하는 <code>.tilenamer.json</code>이며 PNG 출력 폴더와는 별개입니다.</p>
 
 <h2>13. 내보내기</h2>
-<p>전체 내보내기, 현재 타일 내보내기, 다른 폴더로 내보내기를 제공합니다. 결과는 선택한 폴더의
+<p><b>출력 위치</b>는 PNG 타일이 생성되는 기본 폴더이며 오른쪽 패널의 <b>출력</b> 섹션에서 실제
+<code>TileImages</code> 경로를 항상 확인할 수 있습니다. 전체 내보내기와 현재 타일 내보내기는
+이 기본 위치를 재사용합니다. <b>다른 위치로 내보내기</b>는 기본 출력 위치를 바꾸지 않는
+일회성 Export입니다. 결과는 선택한 base 폴더의
 <code>TileImages/&lt;prefix&gt;_00.png</code> 구조로 생성됩니다.</p>
 
 <h2>14. Theme / Alpha 배경</h2>

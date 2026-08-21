@@ -37,7 +37,7 @@ def menu_texts(window: MainWindow, object_name: str) -> list[str]:
 def test_version_is_shared_by_title_about_and_check_mode(tmp_path: Path) -> None:
     qt = app()
     window = MainWindow(ROOT, isolated_preferences(tmp_path))
-    assert __version__ == "0.1.4"
+    assert __version__ == "0.1.5"
     assert window.windowTitle() == f"TileNamer v{__version__}"
     assert not hasattr(window, "version_label")
     about = window.create_about_dialog()
@@ -59,7 +59,11 @@ def test_editor_menus_and_help_content(tmp_path: Path) -> None:
         "파일", "편집", "보기", "도움말",
     ]
     assert "이미지 열기…" in menu_texts(window, "fileMenu")
-    assert "다른 폴더로 내보내기…" in menu_texts(window, "fileMenu")
+    assert "내보내기" in menu_texts(window, "fileMenu")
+    assert menu_texts(window, "exportMenu") == [
+        "전체 내보내기…", "현재 타일 내보내기…", "다른 위치로 내보내기…",
+        "출력 위치 변경…", "출력 폴더 열기",
+    ]
     assert menu_texts(window, "editMenu") == ["실행 취소", "다시 실행"]
     assert "Aseprite 자동 새로고침" in menu_texts(window, "viewMenu")
     assert menu_texts(window, "helpMenu") == ["TileNamer 사용법", "단축키", "TileNamer 정보"]
@@ -132,6 +136,9 @@ def test_temporary_tag_buttons_follow_selected_category(tmp_path: Path) -> None:
     window = MainWindow(ROOT, isolated_preferences(tmp_path))
     window.category_tree.setCurrentItem(window.category_items["Platform_Center"])
     assert window.add_tag_button.text() == "+ 임시 태그"
+    assert window.add_tag_button.isEnabled()
+    heights = {button.minimumHeight() for button in window.temporary_tag_buttons}
+    assert len(heights) == 1 and next(iter(heights)) >= 32
     assert not window.rename_tag_button.isEnabled()
     assert not window.delete_tag_button.isEnabled()
     window.add_temporary_tag("Map_Only")
