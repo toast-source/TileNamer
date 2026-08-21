@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QFrame, QGridLayout, QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QHeaderView, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QComboBox, QScrollArea, QSizePolicy, QSpinBox, QSplitter, QStackedWidget,
-    QTabWidget, QTextBrowser, QTreeWidget, QTreeWidgetItem,
+    QStyledItemDelegate, QTabWidget, QTextBrowser, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,
 )
 
@@ -41,6 +41,8 @@ from .image_loader import (
     LoadedSource, load_source_document,
 )
 from .model import AssetAssignment, AssignmentModel, normalized_region
+from .placement import AssignmentIdentity
+from .placement_window import PlacementPreviewSource, PlacementPreviewWindow
 from .project import TileProject
 from .preferences import Preferences
 from .resources import application_icon
@@ -50,6 +52,7 @@ ROLE_CATEGORY = int(Qt.ItemDataRole.UserRole)
 ROLE_SEARCH = ROLE_CATEGORY + 1
 ROLE_LAYER_ID = ROLE_SEARCH + 1
 ROLE_TEMPORARY_TAG = ROLE_LAYER_ID + 1
+ROLE_LOCATE_FLASH = ROLE_TEMPORARY_TAG + 1
 
 
 class UiTokens:
@@ -63,6 +66,17 @@ class UiTokens:
     PANEL_MIN_RIGHT = 250
     WINDOW_MIN_WIDTH = 1100
     WINDOW_MIN_HEIGHT = 680
+
+
+class LocateFlashDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index) -> None:
+        super().paint(painter, option, index)
+        if not index.data(ROLE_LOCATE_FLASH):
+            return
+        painter.save()
+        painter.setPen(QPen(QColor("#55efff"), 3))
+        painter.drawRect(option.rect.adjusted(2, 2, -3, -3))
+        painter.restore()
 
 
 class MiddleElideLabel(QLabel):
@@ -575,6 +589,10 @@ class TileCanvas(QWidget):
 
 
 class MainWindow(QMainWindow):
+    preview_data_changed = Signal()
+    preview_theme_changed = Signal(str)
+    preview_alpha_changed = Signal(object)
+
     def __init__(self, root: Path, preferences: Preferences | None = None) -> None:
         super().__init__()
         self.root = root
@@ -600,6 +618,12 @@ class MainWindow(QMainWindow):
         self._updating_grid_controls = False
         self._current_category = ""
         self._assignment_list_category = ""
+        self.placement_preview_window: PlacementPreviewWindow | None = None
+        self._locate_flash_timer = QTimer(self)
+        self._locate_flash_timer.setInterval(180)
+        self._locate_flash_timer.timeout.connect(self._advance_locate_flash)
+        self._locate_flash_remaining = 0
+        self._locate_flash_item: QListWidgetItem | None = None
         self.temporary_tags: list[str] = []
         self.source_revision = 0
         self.undo_stack = QUndoStack(self)
@@ -687,6 +711,10 @@ class MainWindow(QMainWindow):
             "외부 Aseprite 저장 내용을 자동으로 반영",
         )
         self.auto_reload_action.setCheckable(True)
+        self.placement_preview_action = action(
+            "배치 미리보기", self.show_placement_preview,
+            "현재 Assignment의 Auto Tile 배치 결과를 별도 창에서 확인",
+        )
         self.reset_zoom_action = action("100%로 보기", lambda: self._set_zoom(1.0))
 
         self.help_action = action("TileNamer 사용법", self.show_help_dialog)
@@ -723,6 +751,8 @@ class MainWindow(QMainWindow):
         alpha_menu.addActions(tuple(self.alpha_actions.values()))
         view_menu.addSeparator()
         view_menu.addAction(self.auto_reload_action)
+        view_menu.addSeparator()
+        view_menu.addAction(self.placement_preview_action)
         view_menu.addSeparator()
         view_menu.addAction(self.reset_zoom_action)
 
@@ -1085,6 +1115,7 @@ class MainWindow(QMainWindow):
         self.assignment_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.assignment_list.setSpacing(2)
         self.assignment_list.setIconSize(QSize(48, 48))
+        self.assignment_list.setItemDelegate(LocateFlashDelegate(self.assignment_list))
         self.assignment_list.currentRowChanged.connect(self._assignment_row_changed)
         self.assignment_empty = QLabel("등록된 타일이 없습니다\n\n현재 타일 종류에서\n캔버스의 영역을 선택하세요")
         self.assignment_empty.setObjectName("assignmentEmpty")
@@ -1282,6 +1313,7 @@ class MainWindow(QMainWindow):
         with QSignalBlocker(self.light_theme_action), QSignalBlocker(self.dark_theme_action):
             self.light_theme_action.setChecked(not dark)
             self.dark_theme_action.setChecked(dark)
+        self.preview_theme_changed.emit(self.preferences.theme)
 
     def _set_theme(self, theme: str) -> None:
         self.preferences.theme = theme
@@ -1309,8 +1341,116 @@ class MainWindow(QMainWindow):
         self._apply_alpha_background()
 
     def _apply_alpha_background(self) -> None:
-        self.canvas.set_alpha_colors(self.preferences.alpha_colors())
+        colors = self.preferences.alpha_colors()
+        self.canvas.set_alpha_colors(colors)
         self._refresh_assignment_icons(self.assignment_list.currentRow())
+        self.preview_alpha_changed.emit(colors)
+
+    def _placement_preview_source(self) -> PlacementPreviewSource:
+        return PlacementPreviewSource(
+            self.model, self.source_image, self.grid_reference,
+            self.preferences.alpha_colors(),
+        )
+
+    def show_placement_preview(self) -> None:
+        if self.placement_preview_window is None:
+            self.placement_preview_window = PlacementPreviewWindow(
+                self, self._placement_preview_source, self.app_icon,
+                self.preferences.theme,
+            )
+            self.preview_data_changed.connect(
+                self.placement_preview_window.schedule_refresh
+            )
+            self.preview_theme_changed.connect(
+                self.placement_preview_window.apply_theme
+            )
+            self.preview_alpha_changed.connect(
+                self.placement_preview_window.update_alpha
+            )
+            self.placement_preview_window.assignment_locate_requested.connect(
+                self._locate_preview_assignment
+            )
+            self.placement_preview_window.missing_role_locate_requested.connect(
+                self._locate_preview_missing_role
+            )
+        self.placement_preview_window.show()
+        self.placement_preview_window.raise_()
+        self.placement_preview_window.activateWindow()
+
+    def _select_preview_category(self, category: str) -> bool:
+        item = self.category_items.get(category)
+        if item is None:
+            self.statusBar().showMessage(f"지원되지 않은 배치 역할입니다: {category}", 2200)
+            return False
+        self.category_tree.setCurrentItem(item)
+        self.category_tree.scrollToItem(
+            item, QAbstractItemView.ScrollHint.PositionAtCenter,
+        )
+        return True
+
+    def _locate_preview_assignment(self, identity: AssignmentIdentity) -> None:
+        if not self._select_preview_category(identity.category):
+            return
+        row = next((index for index, assignment in enumerate(
+            self.model.assets(identity.category)
+        ) if assignment.selected_cells == identity.selected_cells), -1)
+        if row < 0:
+            self.statusBar().showMessage("해당 타일이 변경되었거나 삭제되었습니다.", 2200)
+            if self.placement_preview_window is not None:
+                self.placement_preview_window.schedule_refresh()
+            return
+        self.assignment_list.setCurrentRow(row)
+        item = self.assignment_list.item(row)
+        if item is not None:
+            self.assignment_list.scrollToItem(
+                item, QAbstractItemView.ScrollHint.PositionAtCenter,
+            )
+            self._start_locate_flash(item)
+        rule = self.rule_by_name.get(identity.category)
+        filename = rule.filename(row) if rule is not None else f"{identity.category}_{row:02d}.png"
+        self.statusBar().showMessage(f"이 타일입니다!  {filename}", 2200)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _locate_preview_missing_role(self, category: str) -> None:
+        if not self._select_preview_category(category):
+            return
+        self._stop_locate_flash()
+        self.assignment_list.setCurrentRow(-1)
+        self.statusBar().showMessage(f"이 타일이 필요합니다: {category}", 2200)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _start_locate_flash(self, item: QListWidgetItem) -> None:
+        self._stop_locate_flash()
+        self._locate_flash_item = item
+        self._locate_flash_remaining = 3
+        item.setData(ROLE_LOCATE_FLASH, True)
+        self.assignment_list.viewport().update()
+        self._locate_flash_timer.start()
+
+    def _advance_locate_flash(self) -> None:
+        item = self._locate_flash_item
+        if item is None or self.assignment_list.row(item) < 0:
+            self._stop_locate_flash()
+            return
+        current = bool(item.data(ROLE_LOCATE_FLASH))
+        item.setData(ROLE_LOCATE_FLASH, not current)
+        self._locate_flash_remaining -= 1
+        self.assignment_list.viewport().update()
+        if self._locate_flash_remaining <= 0:
+            self._stop_locate_flash()
+
+    def _stop_locate_flash(self) -> None:
+        self._locate_flash_timer.stop()
+        if self._locate_flash_item is not None:
+            self._locate_flash_item.setData(ROLE_LOCATE_FLASH, False)
+        self._locate_flash_item = None
+        self._locate_flash_remaining = 0
+        if hasattr(self, "assignment_list"):
+            self.assignment_list.viewport().update()
 
     def _auto_reload_toggled(self, checked: bool) -> None:
         self.preferences.auto_reload_aseprite = checked
@@ -2069,6 +2209,7 @@ class MainWindow(QMainWindow):
         self.undo_stack.push(AssignmentStateCommand(self, before, after, action))
 
     def refresh_assignments(self) -> None:
+        self._stop_locate_flash()
         category = self.current_category()
         previous_row = (
             self.assignment_list.currentRow()
@@ -2114,6 +2255,7 @@ class MainWindow(QMainWindow):
         self._update_tree_counts()
         self._update_output_bar()
         self.canvas.update()
+        self.preview_data_changed.emit()
 
     def _assignment_output_tooltip(self, rule: CategoryRule, index: int) -> str:
         if self.export_base_directory is None:
@@ -2902,3 +3044,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "내보내기 완료", f"PNG 에셋 {len(written)}개를 생성했습니다.")
         except Exception as error:
             QMessageBox.critical(self, "내보내기 실패", str(error))
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self.placement_preview_window is not None:
+            self.placement_preview_window.close()
+        super().closeEvent(event)

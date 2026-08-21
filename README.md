@@ -3,7 +3,7 @@
 32×32 논리 그리드에서 직사각형 또는 비정형 셀 Shape를 순서대로 선택하고 Platformer Tile Editor
 규칙에 맞는 PNG 파일명으로 내보내는 Windows용 PySide6 도구입니다.
 
-## TileNamer v0.1.5 사용법
+## TileNamer v0.1.6 사용법
 
 - 카테고리는 Platform, Solid, Wall, Top Sequence 트리로 구성되며 이름이나 prefix로 검색할 수 있습니다.
 - 셀을 클릭하면 1×1 에셋을, 셀 사이를 드래그하면 2×1·1×2·2×2 이상의 멀티셀 에셋을 등록합니다.
@@ -22,6 +22,7 @@
 - 등록된 타일 목록은 현재 composite에서 매번 생성한 nearest-neighbor thumbnail을 표시합니다.
 - Light/Dark 테마와 투명 영역 checkerboard를 전역 설정으로 기억하며, Source 픽셀과 Export 결과는 변경하지 않습니다.
 - 프로젝트별 임시 태그를 추가·이름 변경·삭제하여 별도의 Export prefix로 사용할 수 있습니다.
+- `보기 > 배치 미리보기`에서 현재 Assignment를 실제 이웃 규칙에 적용한 결과를 별도 창으로 확인할 수 있습니다. 창을 열어 둔 채 MainWindow에서 계속 편집하면 결과가 자동 갱신됩니다.
 - `리소스 교체`는 Assignment와 임시 태그를 유지한 채 호환되는 Source만 안전하게 교체합니다.
 - Aseprite 자동 새로고침은 저장 이벤트를 debounce하여 반영하며 설정에서 끌 수 있습니다.
 - 신뢰 가능한 문서/Tilemap grid metadata가 있으면 미리보기 확인 후 레이어 정렬값을 자동 적용할 수 있습니다.

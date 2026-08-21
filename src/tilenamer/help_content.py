@@ -85,6 +85,15 @@ Layer position correction과 기본 출력 위치를 저장하고 복원합니�
 <h2>16. Viewport 이동 / Zoom</h2>
 <p>Ctrl+Mouse Wheel로 확대/축소하고 Space+Drag로 Viewport를 이동합니다. Toolbar의 100%를
 누르면 원래 배율로 돌아갑니다.</p>
+
+<h2>17. 배치 미리보기</h2>
+<p>Solid 배치는 필요한 경우 연결된 Platform과 Bridge 타일도 함께 사용합니다.
+Top Sequence 00/01에서는 Start, Repeat, End의 최소·긴 시퀀스를 검수할 수 있으며,
+미리보기 추가로 기존 Grid-aligned PNG Export 방식이 달라지지는 않습니다.
+타일 위에 마우스를 올리면 현재 Placement 전체가 강조되며, 클릭하면 본창에서 정확한
+타일 종류와 등록 후보를 찾아 강조합니다. 누락된 빨간 타일을 클릭하면 필요한 타일
+종류로 이동합니다. 미리보기 안에서는 Ctrl+Mouse Wheel로 확대/축소하고 Space+Drag로
+화면을 이동할 수 있습니다.</p>
 """
 
 

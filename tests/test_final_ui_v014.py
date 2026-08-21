@@ -37,7 +37,7 @@ def menu_texts(window: MainWindow, object_name: str) -> list[str]:
 def test_version_is_shared_by_title_about_and_check_mode(tmp_path: Path) -> None:
     qt = app()
     window = MainWindow(ROOT, isolated_preferences(tmp_path))
-    assert __version__ == "0.1.5"
+    assert __version__ == "0.1.6"
     assert window.windowTitle() == f"TileNamer v{__version__}"
     assert not hasattr(window, "version_label")
     about = window.create_about_dialog()
