@@ -24,18 +24,20 @@ def test_main_window_load_and_assign(tmp_path: Path) -> None:
     window.canvas.grab()
     assert window.source_image.size == (65, 64)
     assert window.assignment_list.count() == 1
-    assert "남는 영역" in window.warning.text()
+    assert "선택 불가" in window.warning.text()
     window.close()
     app.processEvents()
 
 
-def test_tree_search_top_sequence_notice_and_counts(tmp_path: Path) -> None:
+def test_tree_search_top_sequence_assignment_and_counts(tmp_path: Path) -> None:
     app = QApplication.instance() or QApplication([])
     source = tmp_path / "sheet.png"
     Image.new("RGBA", (128, 128), (40, 80, 120, 128)).save(source)
     window = MainWindow(ROOT)
     window._load_source(source)
     assert {"Platform_Center", "Solid_LeftBridge", "Solid_TopSequence_Start_00"} <= set(window.category_items)
+    assert window.category_items["Solid_LeftBottomBridge"].text(0) == "Left Bottom Bridge"
+    assert window.category_items["Solid_LeftBottomBridge"].toolTip(0) == "Solid_LeftBottomBridge"
     assert window.category_items["Solid_TopSequence_Start_00"].parent().parent().text(0) == "Top Sequence"
     window.category_search.setText("bridge")
     app.processEvents()
@@ -45,11 +47,12 @@ def test_tree_search_top_sequence_notice_and_counts(tmp_path: Path) -> None:
     window.category_search.clear()
     window.category_tree.setCurrentItem(window.category_items["Solid_TopSequence_Start_00"])
     app.processEvents()
-    assert "아직 편집을 지원하지 않습니다" in window.warning.text()
-    assert not window.canvas.editing_enabled
+    assert window.canvas.editing_enabled
+    window.assign_region(0, 0, 2, 1)
+    assert len(window.model.assets("Solid_TopSequence_Start_00")) == 1
     window.category_tree.setCurrentItem(window.category_items["Solid_Top"])
     window.assign_region(0, 0, 2, 1)
-    assert "(1)" in window.category_items["Solid_Top"].text(0)
+    assert window.category_items["Solid_Top"].text(1) == "1"
     window.close()
 
 
@@ -84,4 +87,31 @@ def test_canvas_drag_preview_and_zoom_accuracy(tmp_path: Path) -> None:
     app.processEvents()
     assert emitted[-1] == (3, 3, 1, 1)
     assert len(window.model.assets("Solid_Top")) == 2
+    window.close()
+
+
+def test_editor_layout_and_assignment_hierarchy(tmp_path: Path) -> None:
+    app = QApplication.instance() or QApplication([])
+    source = tmp_path / "sheet.png"
+    Image.new("RGBA", (128, 128), (60, 90, 120, 255)).save(source)
+    window = MainWindow(ROOT)
+    assert window.viewport_stack.currentWidget() is window.viewport_empty
+    assert not window.assignment_empty.isHidden()
+    window._load_source(source)
+    assert window.viewport_stack.currentWidget() is window.viewport_scroll
+    window.category_tree.setCurrentItem(window.category_items["Platform_Center"])
+    window.assign_region(0, 0, 2, 2)
+    window.show()
+    app.processEvents()
+    sizes = window.main_splitter.sizes()
+    assert window.windowTitle() == "TileNamer v0.1.4"
+    assert len(sizes) == 3 and sizes[1] > sizes[0] and sizes[1] > sizes[2]
+    assert window.current_label.text() == "Platform Center"
+    assert window.assignment_count_label.text() == "1개"
+    assert window.assignment_empty.isHidden()
+    assert "#00" in window.assignment_list.item(0).text()
+    assert "2×2 · 64×64" in window.assignment_list.item(0).text()
+    assert "Grid 32×32" in window.warning.text()
+    window.assignment_list.setCurrentRow(0)
+    assert window.canvas.selected_assignment_index == 0
     window.close()

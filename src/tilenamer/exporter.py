@@ -6,6 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 from .config import CategoryRule
+from .grid import GridReference
 from .model import AssetAssignment, AssignmentModel, TileCoord
 
 
@@ -30,8 +31,6 @@ def build_export_plan(output_root: str | Path, model: AssignmentModel,
     for name in selected:
         if name not in by_name:
             raise ValueError(f"설정에 없는 카테고리: {name}")
-        if "TopSequence" in name and model.assets(name):
-            raise ValueError("Top Sequence는 현재 버전에서 내보내기를 지원하지 않습니다.")
         rule = by_name[name]
         for position, assignment in enumerate(model.assets(name)):
             target = root / rule.subfolder / rule.filename(position)
@@ -47,22 +46,39 @@ def find_existing_collisions(plan: list[ExportItem]) -> list[Path]:
     return [item.output_path for item in plan if item.output_path.exists()]
 
 
+def extract_assignment_image(
+    source: Image.Image, assignment: AssetAssignment, grid: GridReference,
+) -> Image.Image:
+    """Extract one rectangle or sparse cell mask with transparent holes."""
+    left, top, right, bottom = grid.pixel_rect(assignment)
+    if left < 0 or top < 0 or right > source.width or bottom > source.height:
+        raise ValueError(f"이미지 범위를 벗어난 에셋: {assignment.origin}")
+    if assignment.is_rectangular:
+        return source.crop((left, top, right, bottom)).convert("RGBA")
+    output = Image.new("RGBA", (assignment.output_width_px, assignment.output_height_px))
+    for x_cell, y_cell in assignment.selected_cells or ():
+        cell = AssetAssignment("_cell", x_cell, y_cell)
+        cell_box = grid.pixel_rect(cell)
+        relative = (
+            (x_cell - assignment.x_cell) * grid.cell_width,
+            (y_cell - assignment.y_cell) * grid.cell_height,
+        )
+        output.alpha_composite(source.crop(cell_box).convert("RGBA"), relative)
+    return output
+
+
 def export_tiles(source: Image.Image, plan: list[ExportItem], tile_size: int = 32,
-                 overwrite: bool = False) -> list[Path]:
+                 overwrite: bool = False, grid: GridReference | None = None) -> list[Path]:
     if tile_size != 32:
         raise ValueError("이 버전의 셀 크기는 32×32여야 합니다.")
     collisions = find_existing_collisions(plan)
     if collisions and not overwrite:
         raise FileExistsError(str(collisions[0]))
-    width, height = source.size
+    reference = grid or GridReference(tile_size, tile_size)
     written: list[Path] = []
     for item in plan:
         asset = item.assignment
-        left, top = asset.x_cell * tile_size, asset.y_cell * tile_size
-        right, bottom = left + int(asset.output_width_px), top + int(asset.output_height_px)
-        if left < 0 or top < 0 or right > width or bottom > height:
-            raise ValueError(f"이미지 범위를 벗어난 에셋: {asset.origin}")
         item.output_path.parent.mkdir(parents=True, exist_ok=True)
-        source.crop((left, top, right, bottom)).save(item.output_path, format="PNG")
+        extract_assignment_image(source, asset, reference).save(item.output_path, format="PNG")
         written.append(item.output_path)
     return written

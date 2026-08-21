@@ -8,7 +8,7 @@ TileCoord = tuple[int, int]
 
 @dataclass(frozen=True)
 class AssetAssignment:
-    """One exported asset occupying a rectangular set of 32 px grid cells."""
+    """One exported asset backed by an immutable set of 32 px grid cells."""
 
     category: str
     x_cell: int
@@ -17,12 +17,34 @@ class AssetAssignment:
     height_cells: int = 1
     output_width_px: int | None = None
     output_height_px: int | None = None
+    selected_cells: tuple[TileCoord, ...] | None = None
 
     def __post_init__(self) -> None:
-        if self.x_cell < 0 or self.y_cell < 0:
-            raise ValueError("에셋 셀 좌표는 0 이상이어야 합니다.")
-        if self.width_cells <= 0 or self.height_cells <= 0:
-            raise ValueError("에셋 셀 크기는 양수여야 합니다.")
+        if self.selected_cells is None:
+            if self.x_cell < 0 or self.y_cell < 0:
+                raise ValueError("에셋 셀 좌표는 0 이상이어야 합니다.")
+            if self.width_cells <= 0 or self.height_cells <= 0:
+                raise ValueError("에셋 셀 크기는 양수여야 합니다.")
+            cells = tuple(
+                (x, y)
+                for y in range(self.y_cell, self.y_cell + self.height_cells)
+                for x in range(self.x_cell, self.x_cell + self.width_cells)
+            )
+        else:
+            cells = tuple(sorted({(int(x), int(y)) for x, y in self.selected_cells}, key=lambda c: (c[1], c[0])))
+            if not cells:
+                raise ValueError("에셋은 셀을 하나 이상 포함해야 합니다.")
+            if any(x < 0 or y < 0 for x, y in cells):
+                raise ValueError("에셋 셀 좌표는 0 이상이어야 합니다.")
+            left = min(x for x, _ in cells)
+            top = min(y for _, y in cells)
+            right = max(x for x, _ in cells)
+            bottom = max(y for _, y in cells)
+            object.__setattr__(self, "x_cell", left)
+            object.__setattr__(self, "y_cell", top)
+            object.__setattr__(self, "width_cells", right - left + 1)
+            object.__setattr__(self, "height_cells", bottom - top + 1)
+        object.__setattr__(self, "selected_cells", cells)
         width = self.width_cells * 32 if self.output_width_px is None else self.output_width_px
         height = self.height_cells * 32 if self.output_height_px is None else self.output_height_px
         if width != self.width_cells * 32 or height != self.height_cells * 32:
@@ -35,18 +57,25 @@ class AssetAssignment:
         return self.x_cell, self.y_cell
 
     def occupied_cells(self) -> set[TileCoord]:
-        return {
-            (x, y)
-            for y in range(self.y_cell, self.y_cell + self.height_cells)
-            for x in range(self.x_cell, self.x_cell + self.width_cells)
-        }
+        return set(self.selected_cells or ())
+
+    @property
+    def cell_count(self) -> int:
+        return len(self.selected_cells or ())
+
+    @property
+    def is_rectangular(self) -> bool:
+        return self.cell_count == self.width_cells * self.height_cells
+
+    @classmethod
+    def from_cells(cls, category: str, cells: Iterable[TileCoord]) -> "AssetAssignment":
+        normalized = tuple(cells)
+        return cls(category, 0, 0, selected_cells=normalized)
 
     def same_region(self, other: "AssetAssignment") -> bool:
-        return (self.x_cell, self.y_cell, self.width_cells, self.height_cells) == (
-            other.x_cell, other.y_cell, other.width_cells, other.height_cells
-        )
+        return self.occupied_cells() == other.occupied_cells()
 
-    def to_json(self) -> dict[str, int]:
+    def to_json(self) -> dict[str, Any]:
         return {
             "x_cell": self.x_cell,
             "y_cell": self.y_cell,
@@ -54,6 +83,7 @@ class AssetAssignment:
             "height_cells": self.height_cells,
             "output_width_px": int(self.output_width_px),
             "output_height_px": int(self.output_height_px),
+            "selected_cells": [[x, y] for x, y in self.selected_cells or ()],
         }
 
 
@@ -74,7 +104,7 @@ def normalized_region(start: TileCoord, end: TileCoord) -> tuple[int, int, int, 
 
 @dataclass
 class AssignmentModel:
-    """Ordered, exclusive rectangular asset assignments."""
+    """Ordered, exclusive cell-shape asset assignments."""
 
     assignments: dict[str, list[AssetAssignment | TileCoord | list[int]]] = field(default_factory=dict)
 
@@ -97,11 +127,12 @@ class AssignmentModel:
         if isinstance(value, AssetAssignment):
             if value.category == category:
                 return value
-            return AssetAssignment(category, value.x_cell, value.y_cell, value.width_cells,
-                                   value.height_cells, value.output_width_px, value.output_height_px)
+            return AssetAssignment.from_cells(category, value.selected_cells or ())
         if isinstance(value, (tuple, list)) and len(value) == 2:
             return AssetAssignment(category, int(value[0]), int(value[1]))
         if isinstance(value, dict):
+            if "selected_cells" in value:
+                return AssetAssignment.from_cells(category, value["selected_cells"])
             return AssetAssignment(
                 category, int(value["x_cell"]), int(value["y_cell"]),
                 int(value.get("width_cells", 1)), int(value.get("height_cells", 1)),
@@ -139,6 +170,10 @@ class AssignmentModel:
 
     def assign_region(self, category: str, x: int, y: int, width: int, height: int) -> AssignmentResult:
         candidate = AssetAssignment(category, x, y, width, height)
+        return self.assign_cells(category, candidate.selected_cells or ())
+
+    def assign_cells(self, category: str, cells: Iterable[TileCoord]) -> AssignmentResult:
+        candidate = AssetAssignment.from_cells(category, cells)
         overlaps = self.overlapping(candidate)
         if overlaps:
             if len(overlaps) != 1 or not overlaps[0].same_region(candidate):
@@ -178,7 +213,7 @@ class AssignmentModel:
     def clear(self) -> None:
         self.assignments.clear()
 
-    def as_json(self) -> dict[str, list[dict[str, int]]]:
+    def as_json(self) -> dict[str, list[dict[str, Any]]]:
         return {category: [asset.to_json() for asset in assets]
                 for category, assets in self.assignments.items()}
 

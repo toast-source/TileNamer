@@ -73,7 +73,11 @@ def test_mixed_sizes_keep_candidate_order_and_names(tmp_path: Path) -> None:
     ]
 
 
-def test_top_sequence_export_is_explicitly_rejected(tmp_path: Path) -> None:
+def test_top_sequence_exports_like_a_normal_rectangular_assignment(tmp_path: Path) -> None:
     name = "Solid_TopSequence_Start_00"
-    with pytest.raises(ValueError, match="Top Sequence"):
-        build_export_plan(tmp_path, AssignmentModel({name: [(0, 0)]}), [CategoryRule(name, name)])
+    model = AssignmentModel({name: [AssetAssignment(name, 0, 0, 2, 1)]})
+    plan = build_export_plan(tmp_path, model, [CategoryRule(name, name)])
+    written = export_tiles(Image.new("RGBA", (64, 32), (1, 2, 3, 255)), plan)
+    assert written[0].name == f"{name}_00.png"
+    with Image.open(written[0]) as tile:
+        assert tile.size == (64, 32)
